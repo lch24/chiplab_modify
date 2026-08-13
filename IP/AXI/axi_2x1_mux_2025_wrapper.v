@@ -1,0 +1,156 @@
+module axi_2x1_mux_2025_wrapper (
+    input  wire        aclk,
+    input  wire        aresetn,
+
+    input  wire [3:0]  s0_arid,
+    input  wire [31:0] s0_araddr,
+    input  wire [3:0]  s0_arlen,
+    input  wire [2:0]  s0_arsize,
+    input  wire [1:0]  s0_arburst,
+    input  wire [1:0]  s0_arlock,
+    input  wire [3:0]  s0_arcache,
+    input  wire [2:0]  s0_arprot,
+    input  wire        s0_arvalid,
+    output wire        s0_arready,
+    output wire [3:0]  s0_rid,
+    output wire [31:0] s0_rdata,
+    output wire [1:0]  s0_rresp,
+    output wire        s0_rlast,
+    output wire        s0_rvalid,
+    input  wire        s0_rready,
+
+    input  wire [3:0]  s1_arid,
+    input  wire [31:0] s1_araddr,
+    input  wire [3:0]  s1_arlen,
+    input  wire [2:0]  s1_arsize,
+    input  wire [1:0]  s1_arburst,
+    input  wire [1:0]  s1_arlock,
+    input  wire [3:0]  s1_arcache,
+    input  wire [2:0]  s1_arprot,
+    input  wire        s1_arvalid,
+    output wire        s1_arready,
+    output wire [3:0]  s1_rid,
+    output wire [31:0] s1_rdata,
+    output wire [1:0]  s1_rresp,
+    output wire        s1_rlast,
+    output wire        s1_rvalid,
+    input  wire        s1_rready,
+
+    output wire [3:0]  m_arid,
+    output wire [31:0] m_araddr,
+    output wire [3:0]  m_arlen,
+    output wire [2:0]  m_arsize,
+    output wire [1:0]  m_arburst,
+    output wire [1:0]  m_arlock,
+    output wire [3:0]  m_arcache,
+    output wire [2:0]  m_arprot,
+    output wire        m_arvalid,
+    input  wire        m_arready,
+    input  wire [3:0]  m_rid,
+    input  wire [31:0] m_rdata,
+    input  wire [1:0]  m_rresp,
+    input  wire        m_rlast,
+    input  wire        m_rvalid,
+    output wire        m_rready
+);
+
+wire [1:0]  s_axi_arready;
+wire [7:0]  s_axi_rid;
+wire [63:0] s_axi_rdata;
+wire [3:0]  s_axi_rresp;
+wire [1:0]  s_axi_rlast;
+wire [1:0]  s_axi_rvalid;
+
+assign {s1_arready, s0_arready} = s_axi_arready;
+assign {s1_rid,     s0_rid}     = s_axi_rid;
+assign {s1_rdata,   s0_rdata}   = s_axi_rdata;
+assign {s1_rresp,   s0_rresp}   = s_axi_rresp;
+assign {s1_rlast,   s0_rlast}   = s_axi_rlast;
+assign {s1_rvalid,  s0_rvalid}  = s_axi_rvalid;
+
+axi_2x1_mux_2025 u_axi_crossbar (
+    .aclk          (aclk),
+    .aresetn       (aresetn),
+
+    .s_axi_awid    (8'b0),
+    .s_axi_awaddr  (64'b0),
+    .s_axi_awlen   (8'b0),
+    .s_axi_awsize  (6'b0),
+    .s_axi_awburst (4'b0),
+    .s_axi_awlock  (4'b0),
+    .s_axi_awcache (8'b0),
+    .s_axi_awprot  (6'b0),
+    .s_axi_awqos   (8'b0),
+    .s_axi_awvalid (2'b0),
+    .s_axi_awready (),
+    .s_axi_wid     (8'b0),
+    .s_axi_wdata   (64'b0),
+    .s_axi_wstrb   (8'b0),
+    .s_axi_wlast   (2'b0),
+    .s_axi_wvalid  (2'b0),
+    .s_axi_wready  (),
+    .s_axi_bid     (),
+    .s_axi_bresp   (),
+    .s_axi_bvalid  (),
+    .s_axi_bready  (2'b0),
+
+    .s_axi_arid    ({s1_arid, s0_arid}),
+    .s_axi_araddr  ({s1_araddr, s0_araddr}),
+    .s_axi_arlen   ({s1_arlen, s0_arlen}),
+    .s_axi_arsize  ({s1_arsize, s0_arsize}),
+    .s_axi_arburst ({s1_arburst, s0_arburst}),
+    .s_axi_arlock  ({s1_arlock, s0_arlock}),
+    .s_axi_arcache ({s1_arcache, s0_arcache}),
+    .s_axi_arprot  ({s1_arprot, s0_arprot}),
+    .s_axi_arqos   (8'b0),
+    .s_axi_arvalid ({s1_arvalid, s0_arvalid}),
+    .s_axi_arready (s_axi_arready),
+    .s_axi_rid     (s_axi_rid),
+    .s_axi_rdata   (s_axi_rdata),
+    .s_axi_rresp   (s_axi_rresp),
+    .s_axi_rlast   (s_axi_rlast),
+    .s_axi_rvalid  (s_axi_rvalid),
+    .s_axi_rready  ({s1_rready, s0_rready}),
+
+    .m_axi_awid    (),
+    .m_axi_awaddr  (),
+    .m_axi_awlen   (),
+    .m_axi_awsize  (),
+    .m_axi_awburst (),
+    .m_axi_awlock  (),
+    .m_axi_awcache (),
+    .m_axi_awprot  (),
+    .m_axi_awqos   (),
+    .m_axi_awvalid (),
+    .m_axi_awready (1'b0),
+    .m_axi_wid     (),
+    .m_axi_wdata   (),
+    .m_axi_wstrb   (),
+    .m_axi_wlast   (),
+    .m_axi_wvalid  (),
+    .m_axi_wready  (1'b0),
+    .m_axi_bid     (4'b0),
+    .m_axi_bresp   (2'b0),
+    .m_axi_bvalid  (1'b0),
+    .m_axi_bready  (),
+
+    .m_axi_arid    (m_arid),
+    .m_axi_araddr  (m_araddr),
+    .m_axi_arlen   (m_arlen),
+    .m_axi_arsize  (m_arsize),
+    .m_axi_arburst (m_arburst),
+    .m_axi_arlock  (m_arlock),
+    .m_axi_arcache (m_arcache),
+    .m_axi_arprot  (m_arprot),
+    .m_axi_arqos   (),
+    .m_axi_arvalid (m_arvalid),
+    .m_axi_arready (m_arready),
+    .m_axi_rid     (m_rid),
+    .m_axi_rdata   (m_rdata),
+    .m_axi_rresp   (m_rresp),
+    .m_axi_rlast   (m_rlast),
+    .m_axi_rvalid  (m_rvalid),
+    .m_axi_rready  (m_rready)
+);
+
+endmodule
