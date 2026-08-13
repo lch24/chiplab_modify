@@ -9,7 +9,7 @@
     "parameters": {
       "component_parameters": {
         "PROTOCOL": [ { "value": "AXI4", "value_src": "propagated", "value_permission": "bd_and_user", "resolve_type": "user", "usage": "all" } ],
-        "READ_WRITE_MODE": [ { "value": "READ_WRITE", "value_permission": "bd_and_user", "resolve_type": "user", "usage": "all" } ],
+        "READ_WRITE_MODE": [ { "value": "READ_WRITE", "value_src": "propagated", "value_permission": "bd_and_user", "resolve_type": "user", "usage": "all" } ],
         "ADDR_WIDTH": [ { "value": "32", "value_src": "propagated", "value_permission": "bd_and_user", "resolve_type": "user", "format": "long", "usage": "all" } ],
         "PACKING_LEVEL": [ { "value": "1", "resolve_type": "user", "format": "long", "usage": "all" } ],
         "SI_DATA_WIDTH": [ { "value": "64", "value_src": "user", "value_permission": "bd_and_user", "resolve_type": "user", "format": "long", "usage": "all" } ],
@@ -159,7 +159,7 @@
             "WUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "RUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "BUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
-            "READ_WRITE_MODE": [ { "value": "READ_WRITE", "value_permission": "bd", "resolve_type": "generated", "is_ips_inferred": true, "is_static_object": false } ],
+            "READ_WRITE_MODE": [ { "value": "READ_WRITE", "value_src": "propagated", "value_permission": "bd", "resolve_type": "generated", "is_ips_inferred": true, "is_static_object": false } ],
             "HAS_BURST": [ { "value": "1", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "HAS_LOCK": [ { "value": "1", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "HAS_PROT": [ { "value": "1", "value_src": "constant_prop", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
@@ -238,7 +238,7 @@
             "WUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "RUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "BUSER_WIDTH": [ { "value": "0", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
-            "READ_WRITE_MODE": [ { "value": "READ_WRITE", "value_permission": "bd", "resolve_type": "generated", "is_ips_inferred": true, "is_static_object": false } ],
+            "READ_WRITE_MODE": [ { "value": "READ_WRITE", "value_src": "ip_propagated", "value_permission": "bd", "resolve_type": "generated", "is_ips_inferred": true, "is_static_object": false } ],
             "HAS_BURST": [ { "value": "1", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "HAS_LOCK": [ { "value": "1", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "HAS_PROT": [ { "value": "1", "value_src": "constant", "value_permission": "bd", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
@@ -332,5 +332,5 @@
       }
     }
   },
-  "checksum": "7eb1e88e"
+  "checksum": "29f75e0f"
 }

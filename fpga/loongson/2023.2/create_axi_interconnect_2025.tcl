@@ -13,6 +13,7 @@ set_property target_language Verilog [current_project]
 
 create_bd_design axi_interconnect_0_bd
 create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0
+create_bd_cell -type ip -vlnv xilinx.com:ip:axi_register_slice:* m00_id_slice
 
 # Match the old 3-to-1 interconnect topology.  Strategy 2 enables the
 # crossbar; packet FIFOs provide the supported clock-domain crossings.
@@ -26,14 +27,28 @@ set_property -dict [list \
     CONFIG.S02_HAS_DATA_FIFO {2} \
     CONFIG.M00_HAS_DATA_FIFO {2}] [get_bd_cells axi_interconnect_0]
 
-foreach intf {S00_AXI S01_AXI S02_AXI M00_AXI} {
+foreach intf {S00_AXI S01_AXI S02_AXI} {
     make_bd_intf_pins_external [get_bd_intf_pins axi_interconnect_0/$intf]
     set_property name $intf [get_bd_intf_ports ${intf}_0]
 }
 
-# All upstream masters use 4-bit IDs.  AXI Interconnect 2.1 records those IDs
-# internally and restores BID/RID on the selected S port.  Its IPI M port is
-# intentionally ID-less, so the compatibility wrapper drives MIG ID zero.
+# A master interface's ID width is read-only and must be propagated from a
+# connected slave.  The register slice provides that explicit six-bit slave
+# boundary and transparently carries AWID/ARID/BID/RID to the exported port.
+set_property -dict [list \
+    CONFIG.ADDR_WIDTH {32} \
+    CONFIG.DATA_WIDTH {32} \
+    CONFIG.ID_WIDTH {6} \
+    CONFIG.PROTOCOL {AXI4}] [get_bd_cells m00_id_slice]
+connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M00_AXI] \
+                    [get_bd_intf_pins m00_id_slice/S_AXI]
+make_bd_intf_pins_external [get_bd_intf_pins m00_id_slice/M_AXI]
+set_property name M00_AXI [get_bd_intf_ports M_AXI_0]
+
+# All upstream masters use 4-bit IDs.  The interconnect prefixes the 2-bit
+# source-port number, so its MIG-side interface carries a real 6-bit ID.  Keep
+# that ID on the external M port: collapsing it here would serialize different
+# threads at MIG and merely reconstruct IDs on the return path.
 set_property -dict [list \
     CONFIG.ADDR_WIDTH {32} \
     CONFIG.DATA_WIDTH {32} \
@@ -79,6 +94,8 @@ foreach pin {ACLK ARESETN S00_ACLK S00_ARESETN S01_ACLK S01_ARESETN S02_ACLK S02
     make_bd_pins_external [get_bd_pins axi_interconnect_0/$pin]
     set_property name $pin [get_bd_ports ${pin}_0]
 }
+connect_bd_net [get_bd_ports M00_ACLK] [get_bd_pins m00_id_slice/aclk]
+connect_bd_net [get_bd_ports M00_ARESETN] [get_bd_pins m00_id_slice/aresetn]
 set_property CONFIG.ASSOCIATED_RESET {ARESETN}     [get_bd_ports ACLK]
 set_property CONFIG.ASSOCIATED_RESET {S00_ARESETN} [get_bd_ports S00_ACLK]
 set_property CONFIG.ASSOCIATED_RESET {S01_ARESETN} [get_bd_ports S01_ACLK]

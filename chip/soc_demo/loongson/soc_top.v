@@ -844,14 +844,28 @@ wire [4 :0] debug_wb_rf_wnum;
 wire [31:0] debug_wb_rf_wdata;
 wire [31:0] debug_wb_inst;
 wire        ws_valid;
+wire        diag_commit_valid;
+wire [31:0] diag_commit_pc;
+wire [31:0] diag_rob_head_pc;
+wire [31:0] diag_rob_status;
+wire [31:0] diag_sb_head_paddr;
+wire [31:0] diag_sb_status;
+wire [31:0] diag_mshr_status;
+wire [31:0] diag_dcache_status;
 wire        break_point;
 wire        infor_flag;
 wire [ 4:0] reg_num;
 wire [31:0] rf_rdata;
 wire [7 :0] conf_num_csn;
 wire [6 :0] conf_num_a_g;
-assign num_csn = conf_num_csn;
-assign num_a_g = conf_num_a_g;
+wire [7 :0] axi_diag_num_csn;
+wire [6 :0] axi_diag_num_a_g;
+wire [31:0] axi_diag_num_data;
+
+// SW7 enables the non-intrusive AXI read-path diagnostic display.  With SW7
+// clear, CONFREG retains full ownership of the seven-segment display.
+assign num_csn = switch[7] ? axi_diag_num_csn : conf_num_csn;
+assign num_a_g = switch[7] ? axi_diag_num_a_g : conf_num_a_g;
 
 //uart_ram signals
 wire [3 :0] uart_arid   ;
@@ -1011,7 +1025,15 @@ kirchhoff_core_top cpu_mid(
   .debug0_wb_rf_wen    (debug_wb_rf_wen  ),       // output, 写回级寄存器写使能, 未被debug_top使用
   .debug0_wb_rf_wnum   (debug_wb_rf_wnum ),       // output, 写回级写寄存器号, 连接debug_top.debug_wb_rf_wnum
   .debug0_wb_rf_wdata  (debug_wb_rf_wdata),       // output, 写回级写寄存器数据, 连接debug_top.debug_wb_rf_wdata
-  .debug0_wb_inst      (debug_wb_inst    )        // output, 写回级指令, Kirchhoff调试输出
+  .debug0_wb_inst      (debug_wb_inst    ),       // output, 兼容调试口（综合配置固定为0）
+  .diag_commit_valid   (diag_commit_valid),       // output, 真实ROB退休事件
+  .diag_commit_pc      (diag_commit_pc   ),       // output, 真实ROB最后退休PC
+  .diag_rob_head_pc    (diag_rob_head_pc ),       // output, 当前ROB队头PC
+  .diag_rob_status     (diag_rob_status  ),       // output, ROB队头阻塞状态
+  .diag_sb_head_paddr  (diag_sb_head_paddr),      // output, StoreBuffer完成FIFO头地址
+  .diag_sb_status      (diag_sb_status   ),       // output, StoreBuffer状态
+  .diag_mshr_status    (diag_mshr_status ),        // output, MSHR状态
+  .diag_dcache_status  (diag_dcache_status)        // output, DCache Store/维护状态
 );
 
 // AXI 2x1 read interconnect (Vivado 2025.2 AXI Crossbar)
@@ -2354,4 +2376,563 @@ ps2_ctrl PS2_CTRL(
     .ps2_data_oe    (ps2_data_oe),
     .ps2_int        (ps2_int)
 );
+
+// -------------------------------------------------------------------------
+// Non-intrusive CPU AXI read-path diagnostics
+//
+// Set SW7=1 to take over the seven-segment display.  SW[6:5] selects a bank
+// and SW[2:0] selects a page (SW[4:3] are ignored):
+//   bank 0: 0 CPU AR addr, 1 CPU R status, 2 CDC AR addr, 3 CDC R status,
+//           4 DDR-S00 AR addr, 5 DDR-S00 R status, 6 MIG AR addr, 7 MIG R status
+//   bank 1: 0 last committed PC, 1 last committed instruction,
+//           2 commit counter, 3 CPU execution status,
+//           4 CPU AW addr, 5 CPU write status, 6 CPU AR addr, 7 CPU R status
+//   bank 2: 0 CDC AW addr, 1 CDC write status, 2 DDR-S00 AW addr,
+//           3 DDR-S00 write status, 4 MIG AW addr, 5 MIG write status,
+//           6 StoreBuffer status, 7 MSHR status
+//   bank 3: 0 APB/UART AR addr, 1 APB/UART read status,
+//           2 APB/UART AW addr, 3 APB/UART write status,
+//           4 current ROB-head PC, 5 ROB-head status,
+//           6 StoreBuffer completion-head paddr, 7 StoreBuffer status
+//
+// Status word (eight hexadecimal digits):
+//   [31:28] last event: A=AR, b=R beat, C=RLAST, E=RRESP, F=timeout/unowned
+//   [27:24] last ARID, [23:20] last RID, [19:16] last ARLEN low nibble
+//   [15:12] live ARVALID/ARREADY/RVALID/RREADY
+//   [11] RLAST, [10:9] RRESP, [8] any ID active
+//   [7] timeout sticky, [6] unowned RID sticky, [5] RRESP error sticky
+//   [4:0] accepted R-beat count modulo 32
+wire [31:0] axi_diag_cpu_addr;
+wire [31:0] axi_diag_cpu_status;
+wire [31:0] axi_diag_cdc_addr;
+wire [31:0] axi_diag_cdc_status;
+wire [31:0] axi_diag_s00_addr;
+wire [31:0] axi_diag_s00_status;
+wire [31:0] axi_diag_mig_addr;
+wire [31:0] axi_diag_mig_status;
+wire [31:0] axi_diag_cpu_waddr;
+wire [31:0] axi_diag_cpu_wstatus;
+wire [31:0] axi_diag_cdc_waddr;
+wire [31:0] axi_diag_cdc_wstatus;
+wire [31:0] axi_diag_s00_waddr;
+wire [31:0] axi_diag_s00_wstatus;
+wire [31:0] axi_diag_mig_waddr;
+wire [31:0] axi_diag_mig_wstatus;
+wire [31:0] axi_diag_apb_raddr;
+wire [31:0] axi_diag_apb_rstatus;
+wire [31:0] axi_diag_apb_waddr;
+wire [31:0] axi_diag_apb_wstatus;
+
+reg [31:0] axi_diag_commit_pc;
+reg [31:0] axi_diag_commit_inst;
+reg [31:0] axi_diag_commit_count;
+reg [25:0] axi_diag_commit_idle;
+reg        axi_diag_commit_stalled;
+always @(posedge cpu_clk or negedge cpu_aresetn) begin
+    if (!cpu_aresetn) begin
+        axi_diag_commit_pc      <= 32'd0;
+        axi_diag_commit_inst    <= 32'd0;
+        axi_diag_commit_count   <= 32'd0;
+        axi_diag_commit_idle    <= 26'd0;
+        axi_diag_commit_stalled <= 1'b0;
+    end else if (diag_commit_valid) begin
+        axi_diag_commit_pc    <= diag_commit_pc;
+        axi_diag_commit_inst  <= 32'd0;
+        axi_diag_commit_count <= axi_diag_commit_count + 32'd1;
+        axi_diag_commit_idle  <= 26'd0;
+        axi_diag_commit_stalled <= 1'b0;
+    end else begin
+        axi_diag_commit_idle <= axi_diag_commit_idle + 26'd1;
+        if (&axi_diag_commit_idle)
+            axi_diag_commit_stalled <= 1'b1;
+    end
+end
+
+axi_read_diag_probe #(.ID_WIDTH(4), .LEN_WIDTH(4)) AXI_DIAG_CPU (
+    .clk(cpu_clk), .resetn(cpu_aresetn),
+    .arid(m0_arid), .araddr(m0_araddr), .arlen(m0_arlen),
+    .arvalid(m0_arvalid), .arready(m0_arready),
+    .rid(m0_rid), .rresp(m0_rresp), .rlast(m0_rlast),
+    .rvalid(m0_rvalid), .rready(m0_rready),
+    .last_araddr(axi_diag_cpu_addr), .status(axi_diag_cpu_status)
+);
+
+axi_read_diag_probe #(.ID_WIDTH(4), .LEN_WIDTH(4)) AXI_DIAG_CDC (
+    .clk(aclk), .resetn(aresetn),
+    .arid(m0_async_arid), .araddr(m0_async_araddr), .arlen(m0_async_arlen),
+    .arvalid(m0_async_arvalid), .arready(m0_async_arready),
+    .rid(m0_async_rid), .rresp(m0_async_rresp), .rlast(m0_async_rlast),
+    .rvalid(m0_async_rvalid), .rready(m0_async_rready),
+    .last_araddr(axi_diag_cdc_addr), .status(axi_diag_cdc_status)
+);
+
+axi_read_diag_probe #(.ID_WIDTH(4), .LEN_WIDTH(4)) AXI_DIAG_S00 (
+    .clk(aclk), .resetn(aresetn),
+    .arid(s0_arid), .araddr(s0_araddr), .arlen(s0_arlen),
+    .arvalid(s0_arvalid), .arready(s0_arready),
+    .rid(s0_rid), .rresp(s0_rresp), .rlast(s0_rlast),
+    .rvalid(s0_rvalid), .rready(s0_rready),
+    .last_araddr(axi_diag_s00_addr), .status(axi_diag_s00_status)
+);
+
+axi_read_diag_probe #(.ID_WIDTH(6), .LEN_WIDTH(8)) AXI_DIAG_MIG (
+    .clk(c1_clk0), .resetn(interconnect_aresetn),
+    .arid(mig_arid[5:0]), .araddr(mig_araddr), .arlen(mig_arlen),
+    .arvalid(mig_arvalid), .arready(mig_arready),
+    .rid(mig_rid[5:0]), .rresp(mig_rresp), .rlast(mig_rlast),
+    .rvalid(mig_rvalid), .rready(mig_rready),
+    .last_araddr(axi_diag_mig_addr), .status(axi_diag_mig_status)
+);
+
+axi_read_diag_probe #(.ID_WIDTH(4), .LEN_WIDTH(4)) AXI_DIAG_APB_READ (
+    .clk(aclk), .resetn(aresetn),
+    .arid(apb_s_arid), .araddr(apb_s_araddr), .arlen(apb_s_arlen),
+    .arvalid(apb_s_arvalid), .arready(apb_s_arready),
+    .rid(apb_s_rid), .rresp(apb_s_rresp), .rlast(apb_s_rlast),
+    .rvalid(apb_s_rvalid), .rready(apb_s_rready),
+    .last_araddr(axi_diag_apb_raddr), .status(axi_diag_apb_rstatus)
+);
+
+axi_write_diag_probe #(.ID_WIDTH(4), .LEN_WIDTH(4)) AXI_DIAG_CPU_WRITE (
+    .clk(cpu_clk), .resetn(cpu_aresetn),
+    .awid(m0_awid), .awaddr(m0_awaddr), .awlen(m0_awlen),
+    .awvalid(m0_awvalid), .awready(m0_awready),
+    .wlast(m0_wlast), .wvalid(m0_wvalid), .wready(m0_wready),
+    .bid(m0_bid), .bresp(m0_bresp), .bvalid(m0_bvalid), .bready(m0_bready),
+    .last_awaddr(axi_diag_cpu_waddr), .status(axi_diag_cpu_wstatus)
+);
+
+axi_write_diag_probe #(.ID_WIDTH(4), .LEN_WIDTH(4)) AXI_DIAG_CDC_WRITE (
+    .clk(aclk), .resetn(aresetn),
+    .awid(m0_async_awid), .awaddr(m0_async_awaddr), .awlen(m0_async_awlen),
+    .awvalid(m0_async_awvalid), .awready(m0_async_awready),
+    .wlast(m0_async_wlast), .wvalid(m0_async_wvalid), .wready(m0_async_wready),
+    .bid(m0_async_bid), .bresp(m0_async_bresp),
+    .bvalid(m0_async_bvalid), .bready(m0_async_bready),
+    .last_awaddr(axi_diag_cdc_waddr), .status(axi_diag_cdc_wstatus)
+);
+
+axi_write_diag_probe #(.ID_WIDTH(4), .LEN_WIDTH(4)) AXI_DIAG_S00_WRITE (
+    .clk(aclk), .resetn(aresetn),
+    .awid(s0_awid), .awaddr(s0_awaddr), .awlen(s0_awlen),
+    .awvalid(s0_awvalid), .awready(s0_awready),
+    .wlast(s0_wlast), .wvalid(s0_wvalid), .wready(s0_wready),
+    .bid(s0_bid), .bresp(s0_bresp), .bvalid(s0_bvalid), .bready(s0_bready),
+    .last_awaddr(axi_diag_s00_waddr), .status(axi_diag_s00_wstatus)
+);
+
+axi_write_diag_probe #(.ID_WIDTH(6), .LEN_WIDTH(8)) AXI_DIAG_MIG_WRITE (
+    .clk(c1_clk0), .resetn(interconnect_aresetn),
+    .awid(mig_awid[5:0]), .awaddr(mig_awaddr), .awlen(mig_awlen),
+    .awvalid(mig_awvalid), .awready(mig_awready),
+    .wlast(mig_wlast), .wvalid(mig_wvalid), .wready(mig_wready),
+    .bid(mig_bid[5:0]), .bresp(mig_bresp),
+    .bvalid(mig_bvalid), .bready(mig_bready),
+    .last_awaddr(axi_diag_mig_waddr), .status(axi_diag_mig_wstatus)
+);
+
+axi_write_diag_probe #(.ID_WIDTH(4), .LEN_WIDTH(4)) AXI_DIAG_APB_WRITE (
+    .clk(aclk), .resetn(aresetn),
+    .awid(apb_s_awid), .awaddr(apb_s_awaddr), .awlen(apb_s_awlen),
+    .awvalid(apb_s_awvalid), .awready(apb_s_awready),
+    .wlast(apb_s_wlast), .wvalid(apb_s_wvalid), .wready(apb_s_wready),
+    .bid(apb_s_bid), .bresp(apb_s_bresp),
+    .bvalid(apb_s_bvalid), .bready(apb_s_bready),
+    .last_awaddr(axi_diag_apb_waddr), .status(axi_diag_apb_wstatus)
+);
+
+// The probe outputs change only on AXI handshakes.  Two-stage sampling gives a
+// best-effort human-readable snapshot after a stall (a changing multi-bit word
+// may momentarily tear); these signals never feed back into functional logic.
+reg [31:0] axi_diag_cpu_addr_meta, axi_diag_cpu_addr_sync;
+reg [31:0] axi_diag_cpu_status_meta, axi_diag_cpu_status_sync;
+reg [31:0] axi_diag_mig_addr_meta, axi_diag_mig_addr_sync;
+reg [31:0] axi_diag_mig_status_meta, axi_diag_mig_status_sync;
+reg [31:0] axi_diag_cpu_waddr_meta, axi_diag_cpu_waddr_sync;
+reg [31:0] axi_diag_cpu_wstatus_meta, axi_diag_cpu_wstatus_sync;
+reg [31:0] axi_diag_mig_waddr_meta, axi_diag_mig_waddr_sync;
+reg [31:0] axi_diag_mig_wstatus_meta, axi_diag_mig_wstatus_sync;
+reg [31:0] axi_diag_commit_pc_meta, axi_diag_commit_pc_sync;
+reg [31:0] axi_diag_commit_inst_meta, axi_diag_commit_inst_sync;
+reg [31:0] axi_diag_commit_count_meta, axi_diag_commit_count_sync;
+reg [31:0] axi_diag_rob_head_pc_meta, axi_diag_rob_head_pc_sync;
+reg [31:0] axi_diag_rob_status_meta, axi_diag_rob_status_sync;
+reg [31:0] axi_diag_sb_head_paddr_meta, axi_diag_sb_head_paddr_sync;
+reg [31:0] axi_diag_sb_status_meta, axi_diag_sb_status_sync;
+reg [31:0] axi_diag_mshr_status_meta, axi_diag_mshr_status_sync;
+reg [31:0] axi_diag_dcache_status_meta, axi_diag_dcache_status_sync;
+reg        axi_diag_commit_stalled_meta, axi_diag_commit_stalled_sync;
+reg        axi_diag_ws_valid_meta, axi_diag_ws_valid_sync;
+always @(posedge aclk or negedge resetn) begin
+    if (!resetn) begin
+        axi_diag_cpu_addr_meta   <= 32'd0;
+        axi_diag_cpu_addr_sync   <= 32'd0;
+        axi_diag_cpu_status_meta <= 32'd0;
+        axi_diag_cpu_status_sync <= 32'd0;
+        axi_diag_mig_addr_meta   <= 32'd0;
+        axi_diag_mig_addr_sync   <= 32'd0;
+        axi_diag_mig_status_meta <= 32'd0;
+        axi_diag_mig_status_sync <= 32'd0;
+        axi_diag_cpu_waddr_meta   <= 32'd0;
+        axi_diag_cpu_waddr_sync   <= 32'd0;
+        axi_diag_cpu_wstatus_meta <= 32'd0;
+        axi_diag_cpu_wstatus_sync <= 32'd0;
+        axi_diag_mig_waddr_meta   <= 32'd0;
+        axi_diag_mig_waddr_sync   <= 32'd0;
+        axi_diag_mig_wstatus_meta <= 32'd0;
+        axi_diag_mig_wstatus_sync <= 32'd0;
+        axi_diag_commit_pc_meta   <= 32'd0;
+        axi_diag_commit_pc_sync   <= 32'd0;
+        axi_diag_commit_inst_meta <= 32'd0;
+        axi_diag_commit_inst_sync <= 32'd0;
+        axi_diag_commit_count_meta <= 32'd0;
+        axi_diag_commit_count_sync <= 32'd0;
+        axi_diag_rob_head_pc_meta <= 32'd0;
+        axi_diag_rob_head_pc_sync <= 32'd0;
+        axi_diag_rob_status_meta <= 32'd0;
+        axi_diag_rob_status_sync <= 32'd0;
+        axi_diag_sb_head_paddr_meta <= 32'd0;
+        axi_diag_sb_head_paddr_sync <= 32'd0;
+        axi_diag_sb_status_meta <= 32'd0;
+        axi_diag_sb_status_sync <= 32'd0;
+        axi_diag_mshr_status_meta <= 32'd0;
+        axi_diag_mshr_status_sync <= 32'd0;
+        axi_diag_dcache_status_meta <= 32'd0;
+        axi_diag_dcache_status_sync <= 32'd0;
+        axi_diag_commit_stalled_meta <= 1'b0;
+        axi_diag_commit_stalled_sync <= 1'b0;
+        axi_diag_ws_valid_meta <= 1'b0;
+        axi_diag_ws_valid_sync <= 1'b0;
+    end else begin
+        axi_diag_cpu_addr_meta   <= axi_diag_cpu_addr;
+        axi_diag_cpu_addr_sync   <= axi_diag_cpu_addr_meta;
+        axi_diag_cpu_status_meta <= axi_diag_cpu_status;
+        axi_diag_cpu_status_sync <= axi_diag_cpu_status_meta;
+        axi_diag_mig_addr_meta   <= axi_diag_mig_addr;
+        axi_diag_mig_addr_sync   <= axi_diag_mig_addr_meta;
+        axi_diag_mig_status_meta <= axi_diag_mig_status;
+        axi_diag_mig_status_sync <= axi_diag_mig_status_meta;
+        axi_diag_cpu_waddr_meta   <= axi_diag_cpu_waddr;
+        axi_diag_cpu_waddr_sync   <= axi_diag_cpu_waddr_meta;
+        axi_diag_cpu_wstatus_meta <= axi_diag_cpu_wstatus;
+        axi_diag_cpu_wstatus_sync <= axi_diag_cpu_wstatus_meta;
+        axi_diag_mig_waddr_meta   <= axi_diag_mig_waddr;
+        axi_diag_mig_waddr_sync   <= axi_diag_mig_waddr_meta;
+        axi_diag_mig_wstatus_meta <= axi_diag_mig_wstatus;
+        axi_diag_mig_wstatus_sync <= axi_diag_mig_wstatus_meta;
+        axi_diag_commit_pc_meta   <= axi_diag_commit_pc;
+        axi_diag_commit_pc_sync   <= axi_diag_commit_pc_meta;
+        axi_diag_commit_inst_meta <= axi_diag_commit_inst;
+        axi_diag_commit_inst_sync <= axi_diag_commit_inst_meta;
+        axi_diag_commit_count_meta <= axi_diag_commit_count;
+        axi_diag_commit_count_sync <= axi_diag_commit_count_meta;
+        axi_diag_rob_head_pc_meta <= diag_rob_head_pc;
+        axi_diag_rob_head_pc_sync <= axi_diag_rob_head_pc_meta;
+        axi_diag_rob_status_meta <= diag_rob_status;
+        axi_diag_rob_status_sync <= axi_diag_rob_status_meta;
+        axi_diag_sb_head_paddr_meta <= diag_sb_head_paddr;
+        axi_diag_sb_head_paddr_sync <= axi_diag_sb_head_paddr_meta;
+        axi_diag_sb_status_meta <= diag_sb_status;
+        axi_diag_sb_status_sync <= axi_diag_sb_status_meta;
+        axi_diag_mshr_status_meta <= diag_mshr_status;
+        axi_diag_mshr_status_sync <= axi_diag_mshr_status_meta;
+        axi_diag_dcache_status_meta <= diag_dcache_status;
+        axi_diag_dcache_status_sync <= axi_diag_dcache_status_meta;
+        axi_diag_commit_stalled_meta <= axi_diag_commit_stalled;
+        axi_diag_commit_stalled_sync <= axi_diag_commit_stalled_meta;
+        axi_diag_ws_valid_meta <= diag_commit_valid;
+        axi_diag_ws_valid_sync <= axi_diag_ws_valid_meta;
+    end
+end
+
+wire [31:0] axi_diag_read_page =
+    (switch[2:0] == 3'd0) ? axi_diag_cpu_addr_sync   :
+    (switch[2:0] == 3'd1) ? axi_diag_cpu_status_sync :
+    (switch[2:0] == 3'd2) ? axi_diag_cdc_addr        :
+    (switch[2:0] == 3'd3) ? axi_diag_cdc_status      :
+    (switch[2:0] == 3'd4) ? axi_diag_s00_addr        :
+    (switch[2:0] == 3'd5) ? axi_diag_s00_status      :
+    (switch[2:0] == 3'd6) ? axi_diag_mig_addr_sync   :
+                             axi_diag_mig_status_sync;
+wire [31:0] axi_diag_cpu_page =
+    (switch[2:0] == 3'd0) ? axi_diag_commit_pc_sync       :
+    (switch[2:0] == 3'd1) ? axi_diag_commit_inst_sync     :
+    (switch[2:0] == 3'd2) ? axi_diag_commit_count_sync    :
+    (switch[2:0] == 3'd3) ? {axi_diag_commit_stalled_sync,
+                              30'd0, axi_diag_ws_valid_sync} :
+    (switch[2:0] == 3'd4) ? axi_diag_cpu_waddr_sync       :
+    (switch[2:0] == 3'd5) ? axi_diag_cpu_wstatus_sync     :
+    (switch[2:0] == 3'd6) ? axi_diag_cpu_addr_sync        :
+                             axi_diag_cpu_status_sync;
+wire [31:0] axi_diag_write_page =
+    (switch[2:0] == 3'd0) ? axi_diag_cdc_waddr        :
+    (switch[2:0] == 3'd1) ? axi_diag_cdc_wstatus      :
+    (switch[2:0] == 3'd2) ? axi_diag_s00_waddr        :
+    (switch[2:0] == 3'd3) ? axi_diag_s00_wstatus      :
+    (switch[2:0] == 3'd4) ? axi_diag_mig_waddr_sync   :
+    (switch[2:0] == 3'd5) ? axi_diag_mig_wstatus_sync :
+    (switch[2:0] == 3'd6) ? axi_diag_dcache_status_sync :
+                             axi_diag_mshr_status_sync;
+wire [31:0] axi_diag_apb_page =
+    (switch[2:0] == 3'd0) ? axi_diag_apb_raddr   :
+    (switch[2:0] == 3'd1) ? axi_diag_apb_rstatus :
+    (switch[2:0] == 3'd2) ? axi_diag_apb_waddr   :
+    (switch[2:0] == 3'd3) ? axi_diag_apb_wstatus :
+    (switch[2:0] == 3'd4) ? axi_diag_rob_head_pc_sync :
+    (switch[2:0] == 3'd5) ? axi_diag_rob_status_sync :
+    (switch[2:0] == 3'd6) ? axi_diag_sb_head_paddr_sync :
+                             axi_diag_sb_status_sync;
+assign axi_diag_num_data = (switch[6:5] == 2'd0) ? axi_diag_read_page  :
+                           (switch[6:5] == 2'd1) ? axi_diag_cpu_page   :
+                           (switch[6:5] == 2'd2) ? axi_diag_write_page :
+                                                  axi_diag_apb_page;
+
+axi_hex_display AXI_DIAG_DISPLAY (
+    .clk(aclk), .resetn(resetn), .value(axi_diag_num_data),
+    .num_csn(axi_diag_num_csn), .num_a_g(axi_diag_num_a_g)
+);
+endmodule
+
+module axi_read_diag_probe #(
+    parameter integer ID_WIDTH = 4,
+    parameter integer LEN_WIDTH = 4
+) (
+    input  wire                 clk,
+    input  wire                 resetn,
+    input  wire [ID_WIDTH-1:0]  arid,
+    input  wire [31:0]          araddr,
+    input  wire [LEN_WIDTH-1:0] arlen,
+    input  wire                 arvalid,
+    input  wire                 arready,
+    input  wire [ID_WIDTH-1:0]  rid,
+    input  wire [1:0]           rresp,
+    input  wire                 rlast,
+    input  wire                 rvalid,
+    input  wire                 rready,
+    output reg  [31:0]          last_araddr,
+    output wire [31:0]          status
+);
+localparam integer ID_COUNT = (1 << ID_WIDTH);
+wire ar_fire = arvalid && arready;
+wire r_fire = rvalid && rready;
+wire rlast_fire = r_fire && rlast;
+
+reg [ID_COUNT-1:0] active_ids;
+reg [3:0] last_arid;
+reg [3:0] last_rid;
+reg [3:0] last_arlen;
+reg [3:0] last_event;
+reg [4:0] rbeat_count;
+reg [24:0] watchdog;
+reg timeout_sticky;
+reg unowned_sticky;
+reg rresp_sticky;
+
+wire rid_was_owned = active_ids[rid] || (ar_fire && arid == rid);
+
+always @(posedge clk or negedge resetn) begin
+    if (!resetn) begin
+        active_ids      <= {ID_COUNT{1'b0}};
+        last_araddr     <= 32'd0;
+        last_arid       <= 4'd0;
+        last_rid        <= 4'd0;
+        last_arlen      <= 4'd0;
+        last_event      <= 4'd0;
+        rbeat_count     <= 5'd0;
+        watchdog        <= 25'd0;
+        timeout_sticky  <= 1'b0;
+        unowned_sticky  <= 1'b0;
+        rresp_sticky    <= 1'b0;
+    end else begin
+        if (rlast_fire)
+            active_ids[rid] <= 1'b0;
+        if (ar_fire) begin
+            active_ids[arid] <= 1'b1;
+            last_araddr <= araddr;
+            last_arid   <= arid[3:0];
+            last_arlen  <= arlen[3:0];
+            last_event  <= 4'hA;
+        end
+
+        if (r_fire) begin
+            last_rid    <= rid[3:0];
+            rbeat_count <= rbeat_count + 5'd1;
+            last_event  <= rlast ? 4'hC : 4'hB;
+            watchdog    <= 25'd0;
+            if (rresp != 2'b00) begin
+                rresp_sticky <= 1'b1;
+                last_event   <= 4'hE;
+            end
+            if (!rid_was_owned) begin
+                unowned_sticky <= 1'b1;
+                last_event     <= 4'hF;
+            end
+        end else if (|active_ids) begin
+            watchdog <= watchdog + 25'd1;
+            if (&watchdog) begin
+                timeout_sticky <= 1'b1;
+                last_event     <= 4'hF;
+            end
+        end else begin
+            watchdog <= 25'd0;
+        end
+    end
+end
+
+assign status = {last_event, last_arid, last_rid, last_arlen,
+                 arvalid, arready, rvalid, rready,
+                 rlast, rresp, |active_ids,
+                 timeout_sticky, unowned_sticky, rresp_sticky,
+                 rbeat_count};
+endmodule
+
+// Write status word:
+//   [31:28] A=AW, d=WLAST, b=B response, E=BRESP error, F=timeout/unowned B
+//   [27:24] last AWID, [23:20] last BID, [19:16] last AWLEN low nibble
+//   [15:10] AWVALID/AWREADY/WVALID/WREADY/BVALID/BREADY
+//   [9] WLAST, [8] write active
+//   [7] timeout sticky, [6] unowned B sticky, [5] BRESP error sticky
+//   [4:0] completed write count modulo 32
+module axi_write_diag_probe #(
+    parameter integer ID_WIDTH = 4,
+    parameter integer LEN_WIDTH = 4
+) (
+    input  wire                 clk,
+    input  wire                 resetn,
+    input  wire [ID_WIDTH-1:0]  awid,
+    input  wire [31:0]          awaddr,
+    input  wire [LEN_WIDTH-1:0] awlen,
+    input  wire                 awvalid,
+    input  wire                 awready,
+    input  wire                 wlast,
+    input  wire                 wvalid,
+    input  wire                 wready,
+    input  wire [ID_WIDTH-1:0]  bid,
+    input  wire [1:0]           bresp,
+    input  wire                 bvalid,
+    input  wire                 bready,
+    output reg  [31:0]          last_awaddr,
+    output wire [31:0]          status
+);
+wire aw_fire = awvalid && awready;
+wire wlast_fire = wvalid && wready && wlast;
+wire b_fire = bvalid && bready;
+
+reg write_active;
+reg [3:0] last_awid;
+reg [3:0] last_bid;
+reg [3:0] last_awlen;
+reg [3:0] last_event;
+reg [4:0] complete_count;
+reg [24:0] watchdog;
+reg timeout_sticky;
+reg unowned_sticky;
+reg bresp_sticky;
+wire b_was_owned = write_active || aw_fire;
+
+always @(posedge clk or negedge resetn) begin
+    if (!resetn) begin
+        write_active   <= 1'b0;
+        last_awaddr    <= 32'd0;
+        last_awid      <= 4'd0;
+        last_bid       <= 4'd0;
+        last_awlen     <= 4'd0;
+        last_event     <= 4'd0;
+        complete_count <= 5'd0;
+        watchdog       <= 25'd0;
+        timeout_sticky <= 1'b0;
+        unowned_sticky <= 1'b0;
+        bresp_sticky   <= 1'b0;
+    end else begin
+        if (aw_fire) begin
+            write_active <= 1'b1;
+            last_awaddr  <= awaddr;
+            last_awid    <= awid[3:0];
+            last_awlen   <= awlen[3:0];
+            last_event   <= 4'hA;
+        end
+        if (wlast_fire)
+            last_event <= 4'hD;
+
+        if (b_fire) begin
+            // A new AW may be accepted in the same cycle as the previous B.
+            write_active   <= aw_fire;
+            last_bid       <= bid[3:0];
+            last_event     <= 4'hB;
+            complete_count <= complete_count + 5'd1;
+            watchdog       <= 25'd0;
+            if (bresp != 2'b00) begin
+                bresp_sticky <= 1'b1;
+                last_event   <= 4'hE;
+            end
+            if (!b_was_owned) begin
+                unowned_sticky <= 1'b1;
+                last_event     <= 4'hF;
+            end
+        end else if (write_active) begin
+            watchdog <= watchdog + 25'd1;
+            if (&watchdog) begin
+                timeout_sticky <= 1'b1;
+                last_event     <= 4'hF;
+            end
+        end else begin
+            watchdog <= 25'd0;
+        end
+    end
+end
+
+assign status = {last_event, last_awid, last_bid, last_awlen,
+                 awvalid, awready, wvalid, wready, bvalid, bready,
+                 wlast, write_active,
+                 timeout_sticky, unowned_sticky, bresp_sticky,
+                 complete_count};
+endmodule
+
+module axi_hex_display (
+    input  wire        clk,
+    input  wire        resetn,
+    input  wire [31:0] value,
+    output reg  [7:0]  num_csn,
+    output reg  [6:0]  num_a_g
+);
+reg [19:0] scan_count;
+reg [3:0] digit;
+
+always @(posedge clk or negedge resetn) begin
+    if (!resetn)
+        scan_count <= 20'd0;
+    else
+        scan_count <= scan_count + 20'd1;
+end
+
+always @(*) begin
+    case (scan_count[19:17])
+        3'd0: begin num_csn = 8'b0111_1111; digit = value[31:28]; end
+        3'd1: begin num_csn = 8'b1011_1111; digit = value[27:24]; end
+        3'd2: begin num_csn = 8'b1101_1111; digit = value[23:20]; end
+        3'd3: begin num_csn = 8'b1110_1111; digit = value[19:16]; end
+        3'd4: begin num_csn = 8'b1111_0111; digit = value[15:12]; end
+        3'd5: begin num_csn = 8'b1111_1011; digit = value[11:8];  end
+        3'd6: begin num_csn = 8'b1111_1101; digit = value[7:4];   end
+        default: begin num_csn = 8'b1111_1110; digit = value[3:0]; end
+    endcase
+    case (digit)
+        4'h0: num_a_g = 7'b1111110;
+        4'h1: num_a_g = 7'b0110000;
+        4'h2: num_a_g = 7'b1101101;
+        4'h3: num_a_g = 7'b1111001;
+        4'h4: num_a_g = 7'b0110011;
+        4'h5: num_a_g = 7'b1011011;
+        4'h6: num_a_g = 7'b1011111;
+        4'h7: num_a_g = 7'b1110000;
+        4'h8: num_a_g = 7'b1111111;
+        4'h9: num_a_g = 7'b1111011;
+        4'hA: num_a_g = 7'b1110111;
+        4'hB: num_a_g = 7'b0011111;
+        4'hC: num_a_g = 7'b1001110;
+        4'hD: num_a_g = 7'b0111101;
+        4'hE: num_a_g = 7'b1001111;
+        default: num_a_g = 7'b1000111;
+    endcase
+end
 endmodule

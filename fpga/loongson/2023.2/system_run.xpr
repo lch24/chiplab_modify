@@ -66,12 +66,12 @@
     <Option Name="WTVcsLaunchSim" Val="0"/>
     <Option Name="WTRivieraLaunchSim" Val="0"/>
     <Option Name="WTActivehdlLaunchSim" Val="0"/>
-    <Option Name="WTXSimExportSim" Val="100"/>
-    <Option Name="WTModelSimExportSim" Val="100"/>
-    <Option Name="WTQuestaExportSim" Val="100"/>
+    <Option Name="WTXSimExportSim" Val="104"/>
+    <Option Name="WTModelSimExportSim" Val="104"/>
+    <Option Name="WTQuestaExportSim" Val="104"/>
     <Option Name="WTIesExportSim" Val="68"/>
-    <Option Name="WTVcsExportSim" Val="100"/>
-    <Option Name="WTRivieraExportSim" Val="100"/>
+    <Option Name="WTVcsExportSim" Val="104"/>
+    <Option Name="WTRivieraExportSim" Val="104"/>
     <Option Name="WTActivehdlExportSim" Val="68"/>
     <Option Name="GenerateIPUpgradeLog" Val="TRUE"/>
     <Option Name="XSimRadix" Val="hex"/>
@@ -106,8 +106,8 @@
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
-        <CompFileExtendedInfo CompFileName="axi_interconnect_0_bd.bd" FileRelPathName="ip/axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0/axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0.xci">
-          <Proxy FileSetName="axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0"/>
+        <CompFileExtendedInfo CompFileName="axi_interconnect_0_bd.bd" FileRelPathName="ip/axi_interconnect_0_bd_m00_id_slice_0/axi_interconnect_0_bd_m00_id_slice_0.xci">
+          <Proxy FileSetName="axi_interconnect_0_bd_m00_id_slice_0"/>
         </CompFileExtendedInfo>
       </File>
       <File Path="$PPRDIR/../../../IP/xilinx_ip/2023.2/clk_pll_33/clk_pll_33.xci">
@@ -703,9 +703,9 @@
         <Option Name="UseBlackboxStub" Val="1"/>
       </Config>
     </FileSet>
-    <FileSet Name="axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0" Type="BlockSrcs" RelSrcDir="$PSRCDIR/axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0" RelGenDir="$PGENDIR/axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0">
+    <FileSet Name="axi_interconnect_0_bd_m00_id_slice_0" Type="BlockSrcs" RelSrcDir="$PSRCDIR/axi_interconnect_0_bd_m00_id_slice_0" RelGenDir="$PGENDIR/axi_interconnect_0_bd_m00_id_slice_0">
       <Config>
-        <Option Name="TopModule" Val="axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0"/>
+        <Option Name="TopModule" Val="axi_interconnect_0_bd_m00_id_slice_0"/>
         <Option Name="UseBlackboxStub" Val="1"/>
       </Config>
     </FileSet>
@@ -838,7 +838,7 @@
         <ReportConfig DisplayName="synthesis_report" Name="synth_1_copy_1_synth_synthesis_report_0" Spec="" RunStep="synth_design" ReportFile="soc_top.vds">
           <ReportConfigOption Name="dummy_option" Type="string"/>
         </ReportConfig>
-        <ReportConfig DisplayName="Utilization - Synth Design" Name="synth_1_copy_1_synth_report_utilization_0" Spec="report_utilization" RunStep="synth_design" ReportFile="soc_top_utilization_synth.rpt" Version="1" Minor="0">
+        <ReportConfig DisplayName="Utilization - Synth Design" Name="synth_1_copy_1_synth_report_utilization_0" Spec="report_utilization" RunStep="synth_design" ReportFile="soc_top_utilization_synth_1.rpt" Version="1" Minor="0">
           <ReportConfigOption Name="dummy_option" Type="string"/>
           <ReportConfigOutputOption Name="pb" Type="string" Value=""/>
         </ReportConfig>
@@ -846,11 +846,9 @@
       <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
       <RQSFiles/>
     </Run>
-    <Run Id="axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0_synth_1" Type="Ft3:Synth" SrcSet="axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0" Part="xc7a200tfbg676-2" ConstrsSet="axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0" Description="Vivado Synthesis Defaults" AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" Dir="$PRUNDIR/axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0_synth_1" IncludeInArchive="true" IsChild="false" AutoIncrementalDir="$PSRCDIR/utils_1/imports/axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0_synth_1" AutoRQSDir="$PSRCDIR/utils_1/imports/axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0_synth_1" ParallelReportGen="true">
+    <Run Id="axi_interconnect_0_bd_m00_id_slice_0_synth_1" Type="Ft3:Synth" SrcSet="axi_interconnect_0_bd_m00_id_slice_0" Part="xc7a200tfbg676-2" ConstrsSet="axi_interconnect_0_bd_m00_id_slice_0" Description="Vivado Synthesis Defaults" AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" Dir="$PRUNDIR/axi_interconnect_0_bd_m00_id_slice_0_synth_1" IncludeInArchive="true" IsChild="false" AutoIncrementalDir="$PSRCDIR/utils_1/imports/axi_interconnect_0_bd_m00_id_slice_0_synth_1" AutoRQSDir="$PSRCDIR/utils_1/imports/axi_interconnect_0_bd_m00_id_slice_0_synth_1" ParallelReportGen="true">
       <Strategy Version="1" Minor="2">
-        <StratHandle Name="Vivado Synthesis Defaults" Flow="Vivado Synthesis 2025">
-          <Desc>Vivado Synthesis Defaults</Desc>
-        </StratHandle>
+        <StratHandle Name="Vivado Synthesis Defaults" Flow="Vivado Synthesis 2025"/>
         <Step Id="synth_design"/>
       </Strategy>
       <GeneratedRun Dir="$PRUNDIR" File="gen_run.xml"/>
@@ -1020,11 +1018,9 @@
       <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
       <RQSFiles/>
     </Run>
-    <Run Id="axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0_impl_1" Type="Ft2:EntireDesign" Part="xc7a200tfbg676-2" ConstrsSet="axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0" Description="Default settings for Implementation." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" SynthRun="axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0_synth_1" IncludeInArchive="false" IsChild="false" GenFullBitstream="true" AutoIncrementalDir="$PSRCDIR/utils_1/imports/axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0_impl_1" AutoRQSDir="$PSRCDIR/utils_1/imports/axi_interconnect_0_bd_axi_interconnect_0_imp_xbar_0_impl_1" ParallelReportGen="true">
+    <Run Id="axi_interconnect_0_bd_m00_id_slice_0_impl_1" Type="Ft2:EntireDesign" Part="xc7a200tfbg676-2" ConstrsSet="axi_interconnect_0_bd_m00_id_slice_0" Description="Default settings for Implementation." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" SynthRun="axi_interconnect_0_bd_m00_id_slice_0_synth_1" IncludeInArchive="false" IsChild="false" GenFullBitstream="true" AutoIncrementalDir="$PSRCDIR/utils_1/imports/axi_interconnect_0_bd_m00_id_slice_0_impl_1" AutoRQSDir="$PSRCDIR/utils_1/imports/axi_interconnect_0_bd_m00_id_slice_0_impl_1" ParallelReportGen="true">
       <Strategy Version="1" Minor="2">
-        <StratHandle Name="Vivado Implementation Defaults" Flow="Vivado Implementation 2025">
-          <Desc>Default settings for Implementation.</Desc>
-        </StratHandle>
+        <StratHandle Name="Vivado Implementation Defaults" Flow="Vivado Implementation 2025"/>
         <Step Id="init_design"/>
         <Step Id="opt_design"/>
         <Step Id="power_opt_design"/>

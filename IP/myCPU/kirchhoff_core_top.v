@@ -64,7 +64,15 @@ module kirchhoff_core_top #(
     output   [ 3:0] debug0_wb_rf_wen,
     output   [ 4:0] debug0_wb_rf_wnum,
     output   [31:0] debug0_wb_rf_wdata,
-    output   [31:0] debug0_wb_inst
+    output   [31:0] debug0_wb_inst,
+    output          diag_commit_valid,
+    output   [31:0] diag_commit_pc,
+    output   [31:0] diag_rob_head_pc,
+    output   [31:0] diag_rob_status,
+    output   [31:0] diag_sb_head_paddr,
+    output   [31:0] diag_sb_status,
+    output   [31:0] diag_mshr_status,
+    output   [31:0] diag_dcache_status
 `ifdef CPU_2CMT
    ,
     output   [31:0] debug1_wb_pc,
@@ -196,6 +204,14 @@ module kirchhoff_core_top #(
         .io_axi_b_bits_id              (bid),
         .io_axi_b_bits_resp            (bresp),
         .io_extInterrupt               (intrpt)
+       ,.io_diagCommitValid            (diag_commit_valid)
+       ,.io_diagCommitPc               (diag_commit_pc)
+       ,.io_diagRobHeadPc              (diag_rob_head_pc)
+       ,.io_diagRobStatus              (diag_rob_status)
+       ,.io_diagSbHeadPaddr            (diag_sb_head_paddr)
+       ,.io_diagSbStatus               (diag_sb_status)
+       ,.io_diagMshrStatus             (diag_mshr_status)
+       ,.io_diagDcacheStatus           (diag_dcache_status)
 `ifdef DIFFTEST_EN
        ,
         .io_diffTest_0_valid           (cmt0_valid),
