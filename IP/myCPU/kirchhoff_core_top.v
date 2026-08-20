@@ -72,7 +72,16 @@ module kirchhoff_core_top #(
     output   [31:0] diag_sb_head_paddr,
     output   [31:0] diag_sb_status,
     output   [31:0] diag_mshr_status,
-    output   [31:0] diag_dcache_status
+    output   [31:0] diag_dcache_status,
+    output   [31:0] diag_csr_era,
+    output   [31:0] diag_csr_eentry,
+    output   [31:0] diag_csr_boundary_pc,
+    output   [31:0] diag_csr_vector_pc,
+    output   [31:0] diag_csr_crmd,
+    output   [31:0] diag_csr_prmd,
+    output   [31:0] diag_csr_estat,
+    output   [31:0] diag_csr_badv,
+    output   [31:0] diag_csr_tlbrentry
 `ifdef CPU_2CMT
    ,
     output   [31:0] debug1_wb_pc,
@@ -212,6 +221,15 @@ module kirchhoff_core_top #(
        ,.io_diagSbStatus               (diag_sb_status)
        ,.io_diagMshrStatus             (diag_mshr_status)
        ,.io_diagDcacheStatus           (diag_dcache_status)
+       ,.io_diagCsrEra                 (diag_csr_era)
+       ,.io_diagCsrEentry              (diag_csr_eentry)
+       ,.io_diagCsrBoundaryPc          (diag_csr_boundary_pc)
+       ,.io_diagCsrVectorPc            (diag_csr_vector_pc)
+       ,.io_diagCsrCrmd                (diag_csr_crmd)
+       ,.io_diagCsrPrmd                (diag_csr_prmd)
+       ,.io_diagCsrEstat               (diag_csr_estat)
+       ,.io_diagCsrBadv                (diag_csr_badv)
+       ,.io_diagCsrTlbrentry           (diag_csr_tlbrentry)
 `ifdef DIFFTEST_EN
        ,
         .io_diffTest_0_valid           (cmt0_valid),

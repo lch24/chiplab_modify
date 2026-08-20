@@ -31,8 +31,8 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --------------------------------------------------------------------------------
 ------------------------------------------------------------------------------*/
 
-`define SLV_MUX_7
-`define SLV_MUX_NUM  7
+`define SLV_MUX_8
+`define SLV_MUX_NUM  8
 `include "config.h"
 module axi_slave_mux(
 spi_boot,
@@ -330,6 +330,43 @@ s6_rresp,
 s6_rlast,
 s6_rvalid,
 s6_rready,
+
+s7_awid,
+s7_awaddr,
+s7_awlen,
+s7_awsize,
+s7_awburst,
+s7_awlock,
+s7_awcache,
+s7_awprot,
+s7_awvalid,
+s7_awready,
+s7_wid,
+s7_wdata,
+s7_wstrb,
+s7_wlast,
+s7_wvalid,
+s7_wready,
+s7_bid,
+s7_bresp,
+s7_bvalid,
+s7_bready,
+s7_arid,
+s7_araddr,
+s7_arlen,
+s7_arsize,
+s7_arburst,
+s7_arlock,
+s7_arcache,
+s7_arprot,
+s7_arvalid,
+s7_arready,
+s7_rid,
+s7_rdata,
+s7_rresp,
+s7_rlast,
+s7_rvalid,
+s7_rready,
 
 axi_s_aresetn
 );
@@ -640,6 +677,43 @@ input                       s6_rlast;
 input                       s6_rvalid;
 output                      s6_rready;
 
+output [`LID         -1 :0] s7_awid;
+output [`Lawaddr     -1 :0] s7_awaddr;
+output [`Lawlen      -1 :0] s7_awlen;
+output [`Lawsize     -1 :0] s7_awsize;
+output [`Lawburst    -1 :0] s7_awburst;
+output [`Lawlock     -1 :0] s7_awlock;
+output [`Lawcache    -1 :0] s7_awcache;
+output [`Lawprot     -1 :0] s7_awprot;
+output                      s7_awvalid;
+input                       s7_awready;
+output [`LID         -1 :0] s7_wid;
+output [`Lwdata      -1 :0] s7_wdata;
+output [`Lwstrb      -1 :0] s7_wstrb;
+output                      s7_wlast;
+output                      s7_wvalid;
+input                       s7_wready;
+input  [`LID         -1 :0] s7_bid;
+input  [`Lbresp      -1 :0] s7_bresp;
+input                       s7_bvalid;
+output                      s7_bready;
+output [`LID         -1 :0] s7_arid;
+output [`Laraddr     -1 :0] s7_araddr;
+output [`Larlen      -1 :0] s7_arlen;
+output [`Larsize     -1 :0] s7_arsize;
+output [`Larburst    -1 :0] s7_arburst;
+output [`Larlock     -1 :0] s7_arlock;
+output [`Larcache    -1 :0] s7_arcache;
+output [`Larprot     -1 :0] s7_arprot;
+output                      s7_arvalid;
+input                       s7_arready;
+input  [`LID         -1 :0] s7_rid;
+input  [`Lrdata      -1 :0] s7_rdata;
+input  [`Lrresp      -1 :0] s7_rresp;
+input                       s7_rlast;
+input                       s7_rvalid;
+output                      s7_rready;
+
 wire                clk;
 wire                rst_n;
 
@@ -851,6 +925,32 @@ assign s6_arlock  = axi_s_arlock;
 assign s6_arcache = axi_s_arcache;
 assign s6_arprot  = axi_s_arprot;
 
+wire s7_awvalid;
+wire s7_wvalid;
+wire s7_bready;
+wire s7_arvalid;
+wire s7_rready;
+assign s7_awid    = axi_s_awid;
+assign s7_awaddr  = axi_s_awaddr;
+assign s7_awlen   = axi_s_awlen;
+assign s7_awsize  = axi_s_awsize;
+assign s7_awburst = axi_s_awburst;
+assign s7_awlock  = axi_s_awlock;
+assign s7_awcache = axi_s_awcache;
+assign s7_awprot  = axi_s_awprot;
+assign s7_wid     = axi_s_wid;
+assign s7_wdata   = axi_s_wdata;
+assign s7_wstrb   = axi_s_wstrb;
+assign s7_wlast   = axi_s_wlast;
+assign s7_arid    = axi_s_arid;
+assign s7_araddr  = axi_s_araddr;
+assign s7_arlen   = axi_s_arlen;
+assign s7_arsize  = axi_s_arsize;
+assign s7_arburst = axi_s_arburst;
+assign s7_arlock  = axi_s_arlock;
+assign s7_arcache = axi_s_arcache;
+assign s7_arprot  = axi_s_arprot;
+
 reg [`SLV_MUX_NUM-1:0] s_awvalid;
 reg [`SLV_MUX_NUM-1:0] s_wvalid ;
 reg [`SLV_MUX_NUM-1:0] s_bready ;
@@ -896,6 +996,12 @@ assign s6_wvalid           =        s_wvalid [6]  ;
 assign s6_bready           =        s_bready [6]  ;
 assign s6_arvalid          =        s_arvalid[6]  ;
 assign s6_rready           =        s_rready [6]  ;
+
+assign s7_awvalid          =        s_awvalid[7]  ;
+assign s7_wvalid           =        s_wvalid [7]  ;
+assign s7_bready           =        s_bready [7]  ;
+assign s7_arvalid          =        s_arvalid[7]  ;
+assign s7_rready           =        s_rready [7]  ;
 
 assign s_awready[0]  = s0_awready  ;
 assign s_wready[0]   = s0_wready   ;
@@ -978,6 +1084,18 @@ assign s_rresp[6]    = s6_rresp    ;
 assign s_rlast[6]    = s6_rlast    ;
 assign s_rvalid[6]   = s6_rvalid   ;
 
+assign s_awready[7]  = s7_awready  ;
+assign s_wready[7]   = s7_wready   ;
+assign s_bid[7]      = s7_bid      ;
+assign s_bresp[7]    = s7_bresp    ;
+assign s_bvalid[7]   = s7_bvalid   ;
+assign s_arready[7]  = s7_arready  ;
+assign s_rid[7]      = s7_rid      ;
+assign s_rdata[7]    = s7_rdata    ;
+assign s_rresp[7]    = s7_rresp    ;
+assign s_rlast[7]    = s7_rlast    ;
+assign s_rvalid[7]   = s7_rvalid   ;
+
 wire [4:0]BASE_ADDR [`SLV_MUX_NUM-1:0];
 wire [3:0]wr_sel_group_0;
 wire [3:0]wr_sel_group_1;
@@ -995,10 +1113,10 @@ wire [3:0]rd_valid_group_2;
 
 assign bvalid_group_0 = s_bvalid[2:0];
 assign bvalid_group_1 = {1'b0,s_bvalid[4:3]};
-assign bvalid_group_2 = {1'b0,s_bvalid[6:5]};
+assign bvalid_group_2 = s_bvalid[7:5];
 assign rd_valid_group_0 = s_rvalid[2:0];
 assign rd_valid_group_1 = {1'b0,s_rvalid[4:3]};
-assign rd_valid_group_2 = {1'b0,s_rvalid[6:5]};
+assign rd_valid_group_2 = s_rvalid[7:5];
 
 wire                wr_fifo_empty;
 wire                wr_fifo_full;
@@ -1116,7 +1234,8 @@ assign wr_addr_hit[3] = axi_s_awaddr[31:16]==16'h1fd0;  //CONF
 assign wr_addr_hit[4] = axi_s_awaddr[31:16]==16'h1ff0;  //MAC
 assign wr_addr_hit[5] = axi_s_awaddr[31:16]==16'h1fc0;  //LCD
 assign wr_addr_hit[6] = axi_s_awaddr[31:16]==16'h1fb0;  //PS2
-assign wr_addr_hit[0] = ~|wr_addr_hit[6:1];             //DDR3
+assign wr_addr_hit[7] = axi_s_awaddr[31:16]==16'h1fa0;  //USB mouse host
+assign wr_addr_hit[0] = ~|wr_addr_hit[7:1];             //DDR3
 
 nb_sync_fifo_mux wr_fifo
 (
@@ -1215,7 +1334,8 @@ assign rd_addr_hit[3] = (axi_s_araddr[31:16]) ==16'h1fd0;  //CONF
 assign rd_addr_hit[4] = (axi_s_araddr[31:16]) == 16'h1ff0; //MAC
 assign rd_addr_hit[5] = (axi_s_araddr[31:16]) == 16'h1fc0; //LCD
 assign rd_addr_hit[6] = (axi_s_araddr[31:16]) == 16'h1fb0; //PS2
-assign rd_addr_hit[0] = ~|rd_addr_hit[6:1];                //DDR3
+assign rd_addr_hit[7] = (axi_s_araddr[31:16]) == 16'h1fa0; //USB mouse host
+assign rd_addr_hit[0] = ~|rd_addr_hit[7:1];                //DDR3
 
 integer rd_addr_dir_int;
 always @(rd_addr_hit)
@@ -1320,7 +1440,7 @@ end
 endfunction 
 endmodule
 
-`undef SLV_MUX_7
+`undef SLV_MUX_8
 `undef SLV_MUX_NUM
 
 module nb_sync_fifo_mux

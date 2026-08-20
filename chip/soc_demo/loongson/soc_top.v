@@ -126,6 +126,31 @@ module soc_top(
     output        lcd_t_clk,     // Touch screen SPI clock
     output        lcd_t_cs_rst,   // Touch screen chip select/reset
 
+    //------USB3500 UTMI+------
+    input         USB_CLKOUT,
+    inout  [7:0]  USB_DATA,
+    output        USB_TXVALID,
+    input         USB_TXREADY,
+    input         USB_RXVALID,
+    input         USB_RXACTIVE,
+    input         USB_RXERROR,
+    input  [1:0]  USB_LINESTATE,
+    output [1:0]  USB_XCVRSEL,
+    output        USB_TERMSEL,
+    output [1:0]  USB_OPMODE,
+    output        USB_SUSPENDN,
+    output        USB_PHY_RESET,
+    output        USB_DPPD,
+    output        USB_DMPD,
+    output        USB_CHRGVBUS,
+    output        USB_DISCHRGVBUS,
+    output        USB_IDPULLUP,
+    input         USB_VBUSVLD,
+    input         USB_SESSVLD,
+    input         USB_SESSEND,
+    input         USB_HOSTDISC,
+    input         USB_IDDIG,
+
     //------ps2-------
     inout         PS2_CLK,
     inout         PS2_DATA
@@ -423,6 +448,43 @@ wire [`Lrresp-1:0]     ps2_s_rresp;
 wire                   ps2_s_rlast;
 wire                   ps2_s_rvalid;
 wire                   ps2_s_rready;
+
+wire [`LID-1:0]        usb_s_awid;
+wire [`Lawaddr-1:0]    usb_s_awaddr;
+wire [`Lawlen-1:0]     usb_s_awlen;
+wire [`Lawsize-1:0]    usb_s_awsize;
+wire [`Lawburst-1:0]   usb_s_awburst;
+wire [`Lawlock-1:0]    usb_s_awlock;
+wire [`Lawcache-1:0]   usb_s_awcache;
+wire [`Lawprot-1:0]    usb_s_awprot;
+wire                   usb_s_awvalid;
+wire                   usb_s_awready;
+wire [`Lwid-1:0]       usb_s_wid;
+wire [`Lwdata-1:0]     usb_s_wdata;
+wire [`Lwstrb-1:0]     usb_s_wstrb;
+wire                   usb_s_wlast;
+wire                   usb_s_wvalid;
+wire                   usb_s_wready;
+wire [`Lbid-1:0]       usb_s_bid;
+wire [`Lbresp-1:0]     usb_s_bresp;
+wire                   usb_s_bvalid;
+wire                   usb_s_bready;
+wire [`Larid-1:0]      usb_s_arid;
+wire [`Laraddr-1:0]    usb_s_araddr;
+wire [`Larlen-1:0]     usb_s_arlen;
+wire [`Larsize-1:0]    usb_s_arsize;
+wire [`Larburst-1:0]   usb_s_arburst;
+wire [`Larlock-1:0]    usb_s_arlock;
+wire [`Larcache-1:0]   usb_s_arcache;
+wire [`Larprot-1:0]    usb_s_arprot;
+wire                   usb_s_arvalid;
+wire                   usb_s_arready;
+wire [`Lrid-1:0]       usb_s_rid;
+wire [`Lrdata-1:0]     usb_s_rdata;
+wire [`Lrresp-1:0]     usb_s_rresp;
+wire                   usb_s_rlast;
+wire                   usb_s_rvalid;
+wire                   usb_s_rready;
 
 wire [`LID         -1 :0] mac_m_awid;
 wire [`Lawaddr     -1 :0] mac_m_awaddr;
@@ -761,6 +823,26 @@ wire ps2_data_i, ps2_data_o, ps2_data_oe;
 IOBUF ps2_clk_iobuf(.IO(PS2_CLK), .I(ps2_clk_o), .T(~ps2_clk_oe), .O(ps2_clk_i));
 IOBUF ps2_data_iobuf(.IO(PS2_DATA), .I(ps2_data_o), .T(~ps2_data_oe), .O(ps2_data_i));
 
+// USB3500 presents a 60 MHz source-synchronous UTMI bus.  DATA is driven by
+// the FPGA only while TXVALID is asserted.
+wire usb_clk;
+wire [7:0] usb_data_i;
+wire [7:0] usb_data_o;
+wire usb_data_oe;
+wire [7:0] usb_data_t;
+BUFG usb_clk_buf(.I(USB_CLKOUT), .O(usb_clk));
+generate
+    genvar usb_data_index;
+    for (usb_data_index = 0; usb_data_index < 8; usb_data_index = usb_data_index + 1) begin: usb_data_iobufs
+        IOBUF usb_data_iobuf(
+            .IO(USB_DATA[usb_data_index]),
+            .I(usb_data_o[usb_data_index]),
+            .T(usb_data_t[usb_data_index]),
+            .O(usb_data_i[usb_data_index])
+        );
+    end
+endgenerate
+
 //nand
 wire       nand_cle   ;
 wire       nand_ale   ;
@@ -820,9 +902,10 @@ assign     uart0_ri_i  = UART_RI ;
 //interrupt
 wire mac_int;
 wire ps2_int;
+wire usb_int;
 wire [6:0] int_out;
 wire [6:0] int_n_i;
-assign int_out = {ps2_int, 1'b0, dma_int,nand_int,spi_inta_o,uart0_int,mac_int};
+assign int_out = {ps2_int, usb_int, dma_int,nand_int,spi_inta_o,uart0_int,mac_int};
 assign int_n_i = ~int_out;
 
 reg cpu_aresetn_1;
@@ -852,6 +935,15 @@ wire [31:0] diag_sb_head_paddr;
 wire [31:0] diag_sb_status;
 wire [31:0] diag_mshr_status;
 wire [31:0] diag_dcache_status;
+wire [31:0] diag_csr_era;
+wire [31:0] diag_csr_eentry;
+wire [31:0] diag_csr_boundary_pc;
+wire [31:0] diag_csr_vector_pc;
+wire [31:0] diag_csr_crmd;
+wire [31:0] diag_csr_prmd;
+wire [31:0] diag_csr_estat;
+wire [31:0] diag_csr_badv;
+wire [31:0] diag_csr_tlbrentry;
 wire        break_point;
 wire        infor_flag;
 wire [ 4:0] reg_num;
@@ -1033,7 +1125,16 @@ kirchhoff_core_top cpu_mid(
   .diag_sb_head_paddr  (diag_sb_head_paddr),      // output, StoreBuffer完成FIFO头地址
   .diag_sb_status      (diag_sb_status   ),       // output, StoreBuffer状态
   .diag_mshr_status    (diag_mshr_status ),        // output, MSHR状态
-  .diag_dcache_status  (diag_dcache_status)        // output, DCache Store/维护状态
+  .diag_dcache_status  (diag_dcache_status),       // output, DCache Store/维护状态
+  .diag_csr_era        (diag_csr_era),             // output, CSR ERA/EPC
+  .diag_csr_eentry     (diag_csr_eentry),          // output, CSR EENTRY
+  .diag_csr_boundary_pc (diag_csr_boundary_pc),    // output, 最近一次CSR边界写入ERA的PC
+  .diag_csr_vector_pc  (diag_csr_vector_pc),       // output, 最近一次CSR边界入口PC
+  .diag_csr_crmd       (diag_csr_crmd),            // output, CSR CRMD
+  .diag_csr_prmd       (diag_csr_prmd),            // output, CSR PRMD
+  .diag_csr_estat      (diag_csr_estat),           // output, CSR ESTAT
+  .diag_csr_badv       (diag_csr_badv),            // output, CSR BADV
+  .diag_csr_tlbrentry  (diag_csr_tlbrentry)        // output, CSR TLBRENTRY
 );
 
 // AXI 2x1 read interconnect (Vivado 2025.2 AXI Crossbar)
@@ -1492,6 +1593,43 @@ axi_slave_mux AXI_SLAVE_MUX
 .s6_rlast          (ps2_s_rlast),
 .s6_rvalid         (ps2_s_rvalid),
 .s6_rready         (ps2_s_rready),
+
+.s7_awid           (usb_s_awid),
+.s7_awaddr         (usb_s_awaddr),
+.s7_awlen          (usb_s_awlen),
+.s7_awsize         (usb_s_awsize),
+.s7_awburst        (usb_s_awburst),
+.s7_awlock         (usb_s_awlock),
+.s7_awcache        (usb_s_awcache),
+.s7_awprot         (usb_s_awprot),
+.s7_awvalid        (usb_s_awvalid),
+.s7_awready        (usb_s_awready),
+.s7_wid            (usb_s_wid),
+.s7_wdata          (usb_s_wdata),
+.s7_wstrb          (usb_s_wstrb),
+.s7_wlast          (usb_s_wlast),
+.s7_wvalid         (usb_s_wvalid),
+.s7_wready         (usb_s_wready),
+.s7_bid            (usb_s_bid),
+.s7_bresp          (usb_s_bresp),
+.s7_bvalid         (usb_s_bvalid),
+.s7_bready         (usb_s_bready),
+.s7_arid           (usb_s_arid),
+.s7_araddr         (usb_s_araddr),
+.s7_arlen          (usb_s_arlen),
+.s7_arsize         (usb_s_arsize),
+.s7_arburst        (usb_s_arburst),
+.s7_arlock         (usb_s_arlock),
+.s7_arcache        (usb_s_arcache),
+.s7_arprot         (usb_s_arprot),
+.s7_arvalid        (usb_s_arvalid),
+.s7_arready        (usb_s_arready),
+.s7_rid            (usb_s_rid),
+.s7_rdata          (usb_s_rdata),
+.s7_rresp          (usb_s_rresp),
+.s7_rlast          (usb_s_rlast),
+.s7_rvalid         (usb_s_rvalid),
+.s7_rready         (usb_s_rready),
 
 .axi_s_aclk        (aclk                )
 );
@@ -2377,6 +2515,76 @@ ps2_ctrl PS2_CTRL(
     .ps2_int        (ps2_int)
 );
 
+// Dedicated USB boot-mouse host.  Software performs enumeration and polling
+// through the 0x1fa0_0000 register window.
+usb_mouse_host USB_MOUSE_HOST(
+    .aclk               (aclk),
+    .aresetn            (aresetn),
+    .s_awid             (usb_s_awid),
+    .s_awaddr           (usb_s_awaddr),
+    .s_awlen            (usb_s_awlen),
+    .s_awsize           (usb_s_awsize),
+    .s_awburst          (usb_s_awburst),
+    .s_awlock           (usb_s_awlock),
+    .s_awcache          (usb_s_awcache),
+    .s_awprot           (usb_s_awprot),
+    .s_awvalid          (usb_s_awvalid),
+    .s_awready          (usb_s_awready),
+    .s_wid              (usb_s_wid),
+    .s_wdata            (usb_s_wdata),
+    .s_wstrb            (usb_s_wstrb),
+    .s_wlast            (usb_s_wlast),
+    .s_wvalid           (usb_s_wvalid),
+    .s_wready           (usb_s_wready),
+    .s_bid              (usb_s_bid),
+    .s_bresp            (usb_s_bresp),
+    .s_bvalid           (usb_s_bvalid),
+    .s_bready           (usb_s_bready),
+    .s_arid             (usb_s_arid),
+    .s_araddr           (usb_s_araddr),
+    .s_arlen            (usb_s_arlen),
+    .s_arsize           (usb_s_arsize),
+    .s_arburst          (usb_s_arburst),
+    .s_arlock           (usb_s_arlock),
+    .s_arcache          (usb_s_arcache),
+    .s_arprot           (usb_s_arprot),
+    .s_arvalid          (usb_s_arvalid),
+    .s_arready          (usb_s_arready),
+    .s_rid              (usb_s_rid),
+    .s_rdata            (usb_s_rdata),
+    .s_rresp            (usb_s_rresp),
+    .s_rlast            (usb_s_rlast),
+    .s_rvalid           (usb_s_rvalid),
+    .s_rready           (usb_s_rready),
+    .usb_clk            (usb_clk),
+    .utmi_data_i        (usb_data_i),
+    .utmi_data_o        (usb_data_o),
+    .utmi_data_oe       (usb_data_oe),
+    .utmi_data_t        (usb_data_t),
+    .utmi_txvalid       (USB_TXVALID),
+    .utmi_txready       (USB_TXREADY),
+    .utmi_rxvalid       (USB_RXVALID),
+    .utmi_rxactive      (USB_RXACTIVE),
+    .utmi_rxerror       (USB_RXERROR),
+    .utmi_linestate     (USB_LINESTATE),
+    .utmi_xcvrsel       (USB_XCVRSEL),
+    .utmi_termsel       (USB_TERMSEL),
+    .utmi_opmode        (USB_OPMODE),
+    .utmi_suspendn      (USB_SUSPENDN),
+    .utmi_reset         (USB_PHY_RESET),
+    .utmi_dppd          (USB_DPPD),
+    .utmi_dmpd          (USB_DMPD),
+    .utmi_chrgvbus      (USB_CHRGVBUS),
+    .utmi_dischrgvbus   (USB_DISCHRGVBUS),
+    .utmi_idpullup      (USB_IDPULLUP),
+    .utmi_vbusvld       (USB_VBUSVLD),
+    .utmi_sessvld       (USB_SESSVLD),
+    .utmi_sessend       (USB_SESSEND),
+    .utmi_hostdisc      (USB_HOSTDISC),
+    .utmi_iddig         (USB_IDDIG),
+    .usb_int            (usb_int)
+);
+
 // -------------------------------------------------------------------------
 // Non-intrusive CPU AXI read-path diagnostics
 //
@@ -2561,6 +2769,15 @@ reg [31:0] axi_diag_sb_head_paddr_meta, axi_diag_sb_head_paddr_sync;
 reg [31:0] axi_diag_sb_status_meta, axi_diag_sb_status_sync;
 reg [31:0] axi_diag_mshr_status_meta, axi_diag_mshr_status_sync;
 reg [31:0] axi_diag_dcache_status_meta, axi_diag_dcache_status_sync;
+reg [31:0] axi_diag_csr_era_meta, axi_diag_csr_era_sync;
+reg [31:0] axi_diag_csr_eentry_meta, axi_diag_csr_eentry_sync;
+reg [31:0] axi_diag_csr_boundary_pc_meta, axi_diag_csr_boundary_pc_sync;
+reg [31:0] axi_diag_csr_vector_pc_meta, axi_diag_csr_vector_pc_sync;
+reg [31:0] axi_diag_csr_crmd_meta, axi_diag_csr_crmd_sync;
+reg [31:0] axi_diag_csr_prmd_meta, axi_diag_csr_prmd_sync;
+reg [31:0] axi_diag_csr_estat_meta, axi_diag_csr_estat_sync;
+reg [31:0] axi_diag_csr_badv_meta, axi_diag_csr_badv_sync;
+reg [31:0] axi_diag_csr_tlbrentry_meta, axi_diag_csr_tlbrentry_sync;
 reg        axi_diag_commit_stalled_meta, axi_diag_commit_stalled_sync;
 reg        axi_diag_ws_valid_meta, axi_diag_ws_valid_sync;
 always @(posedge aclk or negedge resetn) begin
@@ -2599,6 +2816,24 @@ always @(posedge aclk or negedge resetn) begin
         axi_diag_mshr_status_sync <= 32'd0;
         axi_diag_dcache_status_meta <= 32'd0;
         axi_diag_dcache_status_sync <= 32'd0;
+        axi_diag_csr_era_meta <= 32'd0;
+        axi_diag_csr_era_sync <= 32'd0;
+        axi_diag_csr_eentry_meta <= 32'd0;
+        axi_diag_csr_eentry_sync <= 32'd0;
+        axi_diag_csr_boundary_pc_meta <= 32'd0;
+        axi_diag_csr_boundary_pc_sync <= 32'd0;
+        axi_diag_csr_vector_pc_meta <= 32'd0;
+        axi_diag_csr_vector_pc_sync <= 32'd0;
+        axi_diag_csr_crmd_meta <= 32'd0;
+        axi_diag_csr_crmd_sync <= 32'd0;
+        axi_diag_csr_prmd_meta <= 32'd0;
+        axi_diag_csr_prmd_sync <= 32'd0;
+        axi_diag_csr_estat_meta <= 32'd0;
+        axi_diag_csr_estat_sync <= 32'd0;
+        axi_diag_csr_badv_meta <= 32'd0;
+        axi_diag_csr_badv_sync <= 32'd0;
+        axi_diag_csr_tlbrentry_meta <= 32'd0;
+        axi_diag_csr_tlbrentry_sync <= 32'd0;
         axi_diag_commit_stalled_meta <= 1'b0;
         axi_diag_commit_stalled_sync <= 1'b0;
         axi_diag_ws_valid_meta <= 1'b0;
@@ -2638,6 +2873,24 @@ always @(posedge aclk or negedge resetn) begin
         axi_diag_mshr_status_sync <= axi_diag_mshr_status_meta;
         axi_diag_dcache_status_meta <= diag_dcache_status;
         axi_diag_dcache_status_sync <= axi_diag_dcache_status_meta;
+        axi_diag_csr_era_meta <= diag_csr_era;
+        axi_diag_csr_era_sync <= axi_diag_csr_era_meta;
+        axi_diag_csr_eentry_meta <= diag_csr_eentry;
+        axi_diag_csr_eentry_sync <= axi_diag_csr_eentry_meta;
+        axi_diag_csr_boundary_pc_meta <= diag_csr_boundary_pc;
+        axi_diag_csr_boundary_pc_sync <= axi_diag_csr_boundary_pc_meta;
+        axi_diag_csr_vector_pc_meta <= diag_csr_vector_pc;
+        axi_diag_csr_vector_pc_sync <= axi_diag_csr_vector_pc_meta;
+        axi_diag_csr_crmd_meta <= diag_csr_crmd;
+        axi_diag_csr_crmd_sync <= axi_diag_csr_crmd_meta;
+        axi_diag_csr_prmd_meta <= diag_csr_prmd;
+        axi_diag_csr_prmd_sync <= axi_diag_csr_prmd_meta;
+        axi_diag_csr_estat_meta <= diag_csr_estat;
+        axi_diag_csr_estat_sync <= axi_diag_csr_estat_meta;
+        axi_diag_csr_badv_meta <= diag_csr_badv;
+        axi_diag_csr_badv_sync <= axi_diag_csr_badv_meta;
+        axi_diag_csr_tlbrentry_meta <= diag_csr_tlbrentry;
+        axi_diag_csr_tlbrentry_sync <= axi_diag_csr_tlbrentry_meta;
         axi_diag_commit_stalled_meta <= axi_diag_commit_stalled;
         axi_diag_commit_stalled_sync <= axi_diag_commit_stalled_meta;
         axi_diag_ws_valid_meta <= diag_commit_valid;
@@ -2673,15 +2926,27 @@ wire [31:0] axi_diag_write_page =
     (switch[2:0] == 3'd5) ? axi_diag_mig_wstatus_sync :
     (switch[2:0] == 3'd6) ? axi_diag_dcache_status_sync :
                              axi_diag_mshr_status_sync;
-wire [31:0] axi_diag_apb_page =
-    (switch[2:0] == 3'd0) ? axi_diag_apb_raddr   :
-    (switch[2:0] == 3'd1) ? axi_diag_apb_rstatus :
-    (switch[2:0] == 3'd2) ? axi_diag_apb_waddr   :
-    (switch[2:0] == 3'd3) ? axi_diag_apb_wstatus :
+wire [31:0] axi_diag_csr_boundary_page =
+    (switch[2:0] == 3'd0) ? axi_diag_csr_era_sync :
+    (switch[2:0] == 3'd1) ? axi_diag_csr_eentry_sync :
+    (switch[2:0] == 3'd2) ? axi_diag_csr_boundary_pc_sync :
+    (switch[2:0] == 3'd3) ? axi_diag_csr_vector_pc_sync :
     (switch[2:0] == 3'd4) ? axi_diag_rob_head_pc_sync :
     (switch[2:0] == 3'd5) ? axi_diag_rob_status_sync :
     (switch[2:0] == 3'd6) ? axi_diag_sb_head_paddr_sync :
                              axi_diag_sb_status_sync;
+wire [31:0] axi_diag_csr_state_page =
+    (switch[2:0] == 3'd0) ? axi_diag_csr_crmd_sync :
+    (switch[2:0] == 3'd1) ? axi_diag_csr_prmd_sync :
+    (switch[2:0] == 3'd2) ? axi_diag_csr_estat_sync :
+    (switch[2:0] == 3'd3) ? axi_diag_csr_badv_sync :
+    (switch[2:0] == 3'd4) ? axi_diag_csr_tlbrentry_sync :
+    (switch[2:0] == 3'd5) ? axi_diag_csr_eentry_sync :
+    (switch[2:0] == 3'd6) ? axi_diag_csr_era_sync :
+                             axi_diag_csr_vector_pc_sync;
+wire [31:0] axi_diag_apb_page =
+    (switch[4:3] == 2'd1) ? axi_diag_csr_state_page :
+                            axi_diag_csr_boundary_page;
 assign axi_diag_num_data = (switch[6:5] == 2'd0) ? axi_diag_read_page  :
                            (switch[6:5] == 2'd1) ? axi_diag_cpu_page   :
                            (switch[6:5] == 2'd2) ? axi_diag_write_page :

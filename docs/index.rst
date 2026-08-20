@@ -11,6 +11,7 @@ Welcome to chiplab's documentation!
    :numbered:
 
    Quick-Start
+   SoC_Design
    Simulation/verilator
    Simulation/difftest
    Simulation/lightsss

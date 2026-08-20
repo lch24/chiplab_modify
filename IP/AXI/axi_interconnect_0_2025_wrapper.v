@@ -63,10 +63,48 @@ module axi_interconnect_0 (
     input [1:0] M00_AXI_RRESP, input M00_AXI_RLAST, input M00_AXI_RVALID,
     output M00_AXI_RREADY
 );
-    assign S00_AXI_ARESET_OUT_N = INTERCONNECT_ARESETN;
-    assign S01_AXI_ARESET_OUT_N = INTERCONNECT_ARESETN;
-    assign S02_AXI_ARESET_OUT_N = INTERCONNECT_ARESETN;
-    assign M00_AXI_ARESET_OUT_N = INTERCONNECT_ARESETN;
+    reg [1:0] s00_aresetn_sync;
+    reg [1:0] s01_aresetn_sync;
+    reg [1:0] s02_aresetn_sync;
+    reg [1:0] m00_aresetn_sync;
+
+    always @(posedge S00_AXI_ACLK or negedge INTERCONNECT_ARESETN) begin
+        if (!INTERCONNECT_ARESETN)
+            s00_aresetn_sync <= 2'b00;
+        else
+            s00_aresetn_sync <= {s00_aresetn_sync[0], 1'b1};
+    end
+
+    always @(posedge S01_AXI_ACLK or negedge INTERCONNECT_ARESETN) begin
+        if (!INTERCONNECT_ARESETN)
+            s01_aresetn_sync <= 2'b00;
+        else
+            s01_aresetn_sync <= {s01_aresetn_sync[0], 1'b1};
+    end
+
+    always @(posedge S02_AXI_ACLK or negedge INTERCONNECT_ARESETN) begin
+        if (!INTERCONNECT_ARESETN)
+            s02_aresetn_sync <= 2'b00;
+        else
+            s02_aresetn_sync <= {s02_aresetn_sync[0], 1'b1};
+    end
+
+    always @(posedge M00_AXI_ACLK or negedge INTERCONNECT_ARESETN) begin
+        if (!INTERCONNECT_ARESETN)
+            m00_aresetn_sync <= 2'b00;
+        else
+            m00_aresetn_sync <= {m00_aresetn_sync[0], 1'b1};
+    end
+
+    wire s00_axi_aresetn = s00_aresetn_sync[1];
+    wire s01_axi_aresetn = s01_aresetn_sync[1];
+    wire s02_axi_aresetn = s02_aresetn_sync[1];
+    wire m00_axi_aresetn = m00_aresetn_sync[1];
+
+    assign S00_AXI_ARESET_OUT_N = s00_axi_aresetn;
+    assign S01_AXI_ARESET_OUT_N = s01_axi_aresetn;
+    assign S02_AXI_ARESET_OUT_N = s02_axi_aresetn;
+    assign M00_AXI_ARESET_OUT_N = m00_axi_aresetn;
     // The crossbar prefixes the 4-bit upstream ID with its 2-bit source-port
     // tag.  Preserve that complete 6-bit transaction identity at MIG; the MIG
     // port is 8 bits wide, so only zero-extension is required.
@@ -80,11 +118,11 @@ module axi_interconnect_0 (
     assign m00_rid = M00_AXI_RID[5:0];
 
     axi_interconnect_0_bd u_bd (
-        .ACLK(INTERCONNECT_ACLK), .ARESETN(INTERCONNECT_ARESETN),
-        .S00_ACLK(S00_AXI_ACLK), .S00_ARESETN(INTERCONNECT_ARESETN),
-        .S01_ACLK(S01_AXI_ACLK), .S01_ARESETN(INTERCONNECT_ARESETN),
-        .S02_ACLK(S02_AXI_ACLK), .S02_ARESETN(INTERCONNECT_ARESETN),
-        .M00_ACLK(M00_AXI_ACLK), .M00_ARESETN(INTERCONNECT_ARESETN),
+        .ACLK(INTERCONNECT_ACLK), .ARESETN(m00_axi_aresetn),
+        .S00_ACLK(S00_AXI_ACLK), .S00_ARESETN(s00_axi_aresetn),
+        .S01_ACLK(S01_AXI_ACLK), .S01_ARESETN(s01_axi_aresetn),
+        .S02_ACLK(S02_AXI_ACLK), .S02_ARESETN(s02_axi_aresetn),
+        .M00_ACLK(M00_AXI_ACLK), .M00_ARESETN(m00_axi_aresetn),
         .S00_AXI_awid(S00_AXI_AWID), .S00_AXI_awaddr(S00_AXI_AWADDR), .S00_AXI_awlen(S00_AXI_AWLEN),
         .S00_AXI_awsize(S00_AXI_AWSIZE), .S00_AXI_awburst(S00_AXI_AWBURST), .S00_AXI_awlock(S00_AXI_AWLOCK),
         .S00_AXI_awcache(S00_AXI_AWCACHE), .S00_AXI_awprot(S00_AXI_AWPROT), .S00_AXI_awqos(S00_AXI_AWQOS),

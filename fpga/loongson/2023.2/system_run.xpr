@@ -66,12 +66,12 @@
     <Option Name="WTVcsLaunchSim" Val="0"/>
     <Option Name="WTRivieraLaunchSim" Val="0"/>
     <Option Name="WTActivehdlLaunchSim" Val="0"/>
-    <Option Name="WTXSimExportSim" Val="104"/>
-    <Option Name="WTModelSimExportSim" Val="104"/>
-    <Option Name="WTQuestaExportSim" Val="104"/>
+    <Option Name="WTXSimExportSim" Val="110"/>
+    <Option Name="WTModelSimExportSim" Val="110"/>
+    <Option Name="WTQuestaExportSim" Val="110"/>
     <Option Name="WTIesExportSim" Val="68"/>
-    <Option Name="WTVcsExportSim" Val="104"/>
-    <Option Name="WTRivieraExportSim" Val="104"/>
+    <Option Name="WTVcsExportSim" Val="110"/>
+    <Option Name="WTRivieraExportSim" Val="110"/>
     <Option Name="WTActivehdlExportSim" Val="68"/>
     <Option Name="GenerateIPUpgradeLog" Val="TRUE"/>
     <Option Name="XSimRadix" Val="hex"/>
@@ -512,6 +512,13 @@
         <FileInfo>
           <Attr Name="ImportPath" Val="$PPRDIR/../../../IP/APB_DEV/URT/uart_transmitter.v"/>
           <Attr Name="ImportTime" Val="1489109246"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../../../IP/USB/usb_mouse_host.v">
+        <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>

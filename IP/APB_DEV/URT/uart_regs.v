@@ -436,11 +436,11 @@ assign lsr1 = rf_overrun;
 assign lsr2 = rf_data_out[1]; 
 assign lsr3 = rf_data_out[0]; 
 assign lsr4 = rf_data_out[2]; 
-// Let software write when the TX FIFO can accept one more byte.  PMON can
-// hand off while the shifter is still draining; treating that as not-ready
-// makes early Linux spin before its first printk.
-assign lsr5 = (tf_count < `UART_FIFO_DEPTH);
-assign lsr6 = (tf_count==5'b0 && (tstate == 3'd0));
+// Linux 8250 treats THRE as permission to push tx_loadsz bytes.  For an
+// ns16550a that is the whole 16-byte FIFO, so advertising "not full" here can
+// overrun the FIFO during bursty tty output.
+assign lsr5 = current_finish && (tf_count==5'b0 && thre_set_en);
+assign lsr6 = (tf_count==5'b0 && thre_set_en && (tstate == 3'd0));
 assign lsr7 = rf_error_bit | rf_overrun;
 
 reg 	 lsr0_d;
