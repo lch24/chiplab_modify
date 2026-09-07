@@ -30,7 +30,7 @@ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --------------------------------------------------------------------------------
 ------------------------------------------------------------------------------*/
-`define FREQ 32'd75000000
+`define FREQ 32'd70000000
 
 // 上板数码管调试：SW7=1 时由 SW6 选择退休 PC/ESTAT。
 // 不需要测试信号时注释掉这一行，wrapper 与 SoC 顶层会断开全部相关连接。

@@ -5,6 +5,58 @@ set_property PACKAGE_PIN AC19 [get_ports clk]
 set_property CLOCK_DEDICATED_ROUTE BACKBONE [get_nets clk]
 create_clock -period 10.000 -name clk -waveform {0.000 5.000} [get_ports clk]
 
+# USB3500 UTMI+ interface (60 MHz PHY CLKOUT)
+set_property PACKAGE_PIN AA20 [get_ports USB_CLKOUT]
+create_clock -period 16.667 -name usb_clkout -waveform {0.000 8.333} [get_ports USB_CLKOUT]
+set_clock_groups -asynchronous \
+    -group [get_clocks -include_generated_clocks clk] \
+    -group [get_clocks usb_clkout]
+
+# USB3500 source-synchronous UTMI timing.  PHY outputs arrive 2--5 ns after
+# CLKOUT rises and are captured by falling-edge registers in the USB host.
+# FPGA DATA, TXVALID and the per-pin DATA tri-state enables are registered in
+# the IOBs on a rising edge and are consumed by the PHY on a later rising
+# edge; USB3500 requires 5 ns setup and 1 ns hold.
+set usb_utmi_inputs [get_ports {USB_DATA[*] USB_TXREADY USB_RXVALID USB_RXACTIVE USB_RXERROR USB_LINESTATE[*]}]
+set_input_delay -clock usb_clkout -min 2.000 $usb_utmi_inputs
+set_input_delay -clock usb_clkout -max 5.000 $usb_utmi_inputs
+set usb_utmi_tx_outputs [get_ports {USB_DATA[*] USB_TXVALID}]
+set_output_delay -clock usb_clkout -min -1.000 $usb_utmi_tx_outputs
+set_output_delay -clock usb_clkout -max 5.000 $usb_utmi_tx_outputs
+set_property PACKAGE_PIN AA3  [get_ports {USB_DATA[0]}]
+set_property PACKAGE_PIN AC3  [get_ports {USB_DATA[1]}]
+set_property PACKAGE_PIN AE1  [get_ports {USB_DATA[2]}]
+set_property PACKAGE_PIN AB4  [get_ports {USB_DATA[3]}]
+set_property PACKAGE_PIN AD3  [get_ports {USB_DATA[4]}]
+set_property PACKAGE_PIN AA4  [get_ports {USB_DATA[5]}]
+set_property PACKAGE_PIN AC4  [get_ports {USB_DATA[6]}]
+set_property PACKAGE_PIN AE2  [get_ports {USB_DATA[7]}]
+set_property PACKAGE_PIN AF23 [get_ports USB_TXVALID]
+set_property PACKAGE_PIN AD21 [get_ports USB_TXREADY]
+set_property PACKAGE_PIN AF22 [get_ports USB_RXVALID]
+set_property PACKAGE_PIN AB5  [get_ports USB_RXACTIVE]
+set_property PACKAGE_PIN AB2  [get_ports USB_RXERROR]
+set_property PACKAGE_PIN AD20 [get_ports {USB_XCVRSEL[0]}]
+set_property PACKAGE_PIN AF4  [get_ports {USB_XCVRSEL[1]}]
+set_property PACKAGE_PIN AE21 [get_ports USB_TERMSEL]
+set_property PACKAGE_PIN AC6  [get_ports {USB_OPMODE[0]}]
+set_property PACKAGE_PIN AF5  [get_ports {USB_OPMODE[1]}]
+set_property PACKAGE_PIN AE20 [get_ports USB_SUSPENDN]
+set_property PACKAGE_PIN AD23 [get_ports USB_PHY_RESET]
+set_property PACKAGE_PIN AB1  [get_ports USB_VBUSVLD]
+set_property PACKAGE_PIN AD4  [get_ports USB_HOSTDISC]
+set_property PACKAGE_PIN AA5  [get_ports {USB_LINESTATE[0]}]
+set_property PACKAGE_PIN AE5  [get_ports {USB_LINESTATE[1]}]
+set_property PACKAGE_PIN AA2  [get_ports USB_SESSVLD]
+set_property PACKAGE_PIN AF2  [get_ports USB_SESSEND]
+set_property PACKAGE_PIN AC2  [get_ports USB_DPPD]
+set_property PACKAGE_PIN AC1  [get_ports USB_DMPD]
+set_property PACKAGE_PIN W4   [get_ports USB_IDDIG]
+set_property PACKAGE_PIN AD5  [get_ports USB_IDPULLUP]
+set_property PACKAGE_PIN AF3  [get_ports USB_CHRGVBUS]
+set_property PACKAGE_PIN AE3  [get_ports USB_DISCHRGVBUS]
+set_property IOSTANDARD LVCMOS33 [get_ports {USB_*}]
+
 #reset
 set_property PACKAGE_PIN Y3 [get_ports resetn]
 

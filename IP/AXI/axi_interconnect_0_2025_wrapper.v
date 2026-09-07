@@ -63,21 +63,66 @@ module axi_interconnect_0 (
     input [1:0] M00_AXI_RRESP, input M00_AXI_RLAST, input M00_AXI_RVALID,
     output M00_AXI_RREADY
 );
-    assign S00_AXI_ARESET_OUT_N = INTERCONNECT_ARESETN;
-    assign S01_AXI_ARESET_OUT_N = INTERCONNECT_ARESETN;
-    assign S02_AXI_ARESET_OUT_N = INTERCONNECT_ARESETN;
-    assign M00_AXI_ARESET_OUT_N = INTERCONNECT_ARESETN;
-    // AXI Interconnect 2.1 keeps source IDs in its transaction queues and its
-    // M00 interface is ID-less. MIG therefore sees a single ordered ID stream.
-    assign M00_AXI_AWID = 8'b0;
-    assign M00_AXI_ARID = 8'b0;
+    reg [1:0] s00_aresetn_sync;
+    reg [1:0] s01_aresetn_sync;
+    reg [1:0] s02_aresetn_sync;
+    reg [1:0] m00_aresetn_sync;
+
+    always @(posedge S00_AXI_ACLK or negedge INTERCONNECT_ARESETN) begin
+        if (!INTERCONNECT_ARESETN)
+            s00_aresetn_sync <= 2'b00;
+        else
+            s00_aresetn_sync <= {s00_aresetn_sync[0], 1'b1};
+    end
+
+    always @(posedge S01_AXI_ACLK or negedge INTERCONNECT_ARESETN) begin
+        if (!INTERCONNECT_ARESETN)
+            s01_aresetn_sync <= 2'b00;
+        else
+            s01_aresetn_sync <= {s01_aresetn_sync[0], 1'b1};
+    end
+
+    always @(posedge S02_AXI_ACLK or negedge INTERCONNECT_ARESETN) begin
+        if (!INTERCONNECT_ARESETN)
+            s02_aresetn_sync <= 2'b00;
+        else
+            s02_aresetn_sync <= {s02_aresetn_sync[0], 1'b1};
+    end
+
+    always @(posedge M00_AXI_ACLK or negedge INTERCONNECT_ARESETN) begin
+        if (!INTERCONNECT_ARESETN)
+            m00_aresetn_sync <= 2'b00;
+        else
+            m00_aresetn_sync <= {m00_aresetn_sync[0], 1'b1};
+    end
+
+    wire s00_axi_aresetn = s00_aresetn_sync[1];
+    wire s01_axi_aresetn = s01_aresetn_sync[1];
+    wire s02_axi_aresetn = s02_aresetn_sync[1];
+    wire m00_axi_aresetn = m00_aresetn_sync[1];
+
+    assign S00_AXI_ARESET_OUT_N = s00_axi_aresetn;
+    assign S01_AXI_ARESET_OUT_N = s01_axi_aresetn;
+    assign S02_AXI_ARESET_OUT_N = s02_axi_aresetn;
+    assign M00_AXI_ARESET_OUT_N = m00_axi_aresetn;
+    // The crossbar prefixes the 4-bit upstream ID with its 2-bit source-port
+    // tag.  Preserve that complete 6-bit transaction identity at MIG; the MIG
+    // port is 8 bits wide, so only zero-extension is required.
+    wire [5:0] m00_awid;
+    wire [5:0] m00_bid;
+    wire [5:0] m00_arid;
+    wire [5:0] m00_rid;
+    assign M00_AXI_AWID = {2'b0, m00_awid};
+    assign M00_AXI_ARID = {2'b0, m00_arid};
+    assign m00_bid = M00_AXI_BID[5:0];
+    assign m00_rid = M00_AXI_RID[5:0];
 
     axi_interconnect_0_bd u_bd (
-        .ACLK(INTERCONNECT_ACLK), .ARESETN(INTERCONNECT_ARESETN),
-        .S00_ACLK(S00_AXI_ACLK), .S00_ARESETN(INTERCONNECT_ARESETN),
-        .S01_ACLK(S01_AXI_ACLK), .S01_ARESETN(INTERCONNECT_ARESETN),
-        .S02_ACLK(S02_AXI_ACLK), .S02_ARESETN(INTERCONNECT_ARESETN),
-        .M00_ACLK(M00_AXI_ACLK), .M00_ARESETN(INTERCONNECT_ARESETN),
+        .ACLK(INTERCONNECT_ACLK), .ARESETN(m00_axi_aresetn),
+        .S00_ACLK(S00_AXI_ACLK), .S00_ARESETN(s00_axi_aresetn),
+        .S01_ACLK(S01_AXI_ACLK), .S01_ARESETN(s01_axi_aresetn),
+        .S02_ACLK(S02_AXI_ACLK), .S02_ARESETN(s02_axi_aresetn),
+        .M00_ACLK(M00_AXI_ACLK), .M00_ARESETN(m00_axi_aresetn),
         .S00_AXI_awid(S00_AXI_AWID), .S00_AXI_awaddr(S00_AXI_AWADDR), .S00_AXI_awlen(S00_AXI_AWLEN),
         .S00_AXI_awsize(S00_AXI_AWSIZE), .S00_AXI_awburst(S00_AXI_AWBURST), .S00_AXI_awlock(S00_AXI_AWLOCK),
         .S00_AXI_awcache(S00_AXI_AWCACHE), .S00_AXI_awprot(S00_AXI_AWPROT), .S00_AXI_awqos(S00_AXI_AWQOS),
@@ -120,18 +165,18 @@ module axi_interconnect_0 (
         .S02_AXI_rid(S02_AXI_RID), .S02_AXI_rdata(S02_AXI_RDATA), .S02_AXI_rresp(S02_AXI_RRESP),
         .S02_AXI_rlast(S02_AXI_RLAST), .S02_AXI_rvalid(S02_AXI_RVALID), .S02_AXI_rready(S02_AXI_RREADY),
 
-        .M00_AXI_awaddr(M00_AXI_AWADDR), .M00_AXI_awlen(M00_AXI_AWLEN),
+        .M00_AXI_awid(m00_awid), .M00_AXI_awaddr(M00_AXI_AWADDR), .M00_AXI_awlen(M00_AXI_AWLEN),
         .M00_AXI_awsize(M00_AXI_AWSIZE), .M00_AXI_awburst(M00_AXI_AWBURST), .M00_AXI_awlock(M00_AXI_AWLOCK),
         .M00_AXI_awcache(M00_AXI_AWCACHE), .M00_AXI_awprot(M00_AXI_AWPROT), .M00_AXI_awqos(M00_AXI_AWQOS),
         .M00_AXI_awvalid(M00_AXI_AWVALID), .M00_AXI_awready(M00_AXI_AWREADY),
         .M00_AXI_wdata(M00_AXI_WDATA), .M00_AXI_wstrb(M00_AXI_WSTRB), .M00_AXI_wlast(M00_AXI_WLAST),
         .M00_AXI_wvalid(M00_AXI_WVALID), .M00_AXI_wready(M00_AXI_WREADY),
-        .M00_AXI_bresp(M00_AXI_BRESP), .M00_AXI_bvalid(M00_AXI_BVALID), .M00_AXI_bready(M00_AXI_BREADY),
-        .M00_AXI_araddr(M00_AXI_ARADDR), .M00_AXI_arlen(M00_AXI_ARLEN),
+        .M00_AXI_bid(m00_bid), .M00_AXI_bresp(M00_AXI_BRESP), .M00_AXI_bvalid(M00_AXI_BVALID), .M00_AXI_bready(M00_AXI_BREADY),
+        .M00_AXI_arid(m00_arid), .M00_AXI_araddr(M00_AXI_ARADDR), .M00_AXI_arlen(M00_AXI_ARLEN),
         .M00_AXI_arsize(M00_AXI_ARSIZE), .M00_AXI_arburst(M00_AXI_ARBURST), .M00_AXI_arlock(M00_AXI_ARLOCK),
         .M00_AXI_arcache(M00_AXI_ARCACHE), .M00_AXI_arprot(M00_AXI_ARPROT), .M00_AXI_arqos(M00_AXI_ARQOS),
         .M00_AXI_arvalid(M00_AXI_ARVALID), .M00_AXI_arready(M00_AXI_ARREADY),
-        .M00_AXI_rdata(M00_AXI_RDATA), .M00_AXI_rresp(M00_AXI_RRESP),
+        .M00_AXI_rid(m00_rid), .M00_AXI_rdata(M00_AXI_RDATA), .M00_AXI_rresp(M00_AXI_RRESP),
         .M00_AXI_rlast(M00_AXI_RLAST), .M00_AXI_rvalid(M00_AXI_RVALID), .M00_AXI_rready(M00_AXI_RREADY)
     );
 endmodule

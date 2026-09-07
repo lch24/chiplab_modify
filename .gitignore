@@ -82,3 +82,4 @@ software/examples/linux/vmlinux
 !software/examples/linux/init_8f.txt
 *.fst.hier
 *.log
+*.jou
